@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reportar cargador — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .report-wrap {
+      max-width: 560px;
+      margin: 3rem auto;
+      padding: 0 1.25rem 4rem;
+    }
+
+    .report-back {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .85rem;
+      color: var(--soft);
+      text-decoration: none;
+      margin-bottom: 2rem;
+      transition: color var(--t);
+    }
+    .report-back:hover { color: var(--text); }
+
+    .report-header {
+      margin-bottom: 2rem;
+    }
+    .report-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: .35rem;
+    }
+    .report-header .charger-ref {
+      font-size: .9rem;
+      color: var(--soft);
+    }
+    .report-header .charger-ref strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .report-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .tipo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+    }
+
+    .tipo-btn {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .75rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: none;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 500;
+      color: var(--text);
+      text-align: left;
+      transition: all .18s ease;
+      line-height: 1.3;
+    }
+    .tipo-btn .tipo-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .tipo-btn:hover {
+      border-color: var(--accent);
+      background: rgba(45,125,210,.04);
+    }
+    .tipo-btn.selected {
+      border-color: var(--accent);
+      background: rgba(45,125,210,.07);
+      color: var(--accent);
+    }
+
+    .form-group label {
+      display: block;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--soft);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: .5rem;
+    }
+
+    .char-count {
+      font-size: .75rem;
+      color: var(--soft);
+      text-align: right;
+      margin-top: .3rem;
+    }
+
+    .report-actions {
+      display: flex;
+      gap: .75rem;
+    }
+
+    /* Success screen */
+    .success-screen {
+      display: none;
+      text-align: center;
+      padding: 2.5rem 1rem;
+    }
+    .success-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: rgba(59,178,115,.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 1.25rem;
+    }
+    .success-screen h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: .5rem;
+    }
+    .success-screen p {
+      font-size: .9rem;
+      color: var(--soft);
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+<div class="report-wrap">
+
+  <a href="javascript:history.back()" class="report-back">
+    ← Volver
+  </a>
+
+  <div class="report-header">
+    <h1>Reportar un problema</h1>
+    <p class="charger-ref" id="charger-ref">Cargador: <strong id="charger-name">—</strong></p>
+  </div>
+
+  <!-- Formulario -->
+  <div class="report-card" id="form-section">
+
+    <div class="form-group">
+      <label>¿Cuál es el problema?</label>
+      <div class="tipo-grid" id="tipo-grid">
+        <button class="tipo-btn" data-tipo="Fuera de servicio" onclick="seleccionarTipo(this)">
+          <span class="tipo-icon" data-icon="bolt" data-size="20"></span> Fuera de servicio
+        </button>
+        <button class="tipo-btn" data-tipo="Conector dañado" onclick="seleccionarTipo(this)">
+          <span class="tipo-icon" data-icon="plug" data-size="20"></span> Conector dañado
+        </button>
+        <button class="tipo-btn" data-tipo="Precio incorrecto" onclick="seleccionarTipo(this)">
+          <span class="tipo-icon">💰</span> Precio incorrecto
+        </button>
+        <button class="tipo-btn" data-tipo="Acceso bloqueado" onclick="seleccionarTipo(this)">
+          <span class="tipo-icon">🚧</span> Acceso bloqueado
+        </button>
+        <button class="tipo-btn" data-tipo="Información incorrecta" onclick="seleccionarTipo(this)">
+          <span class="tipo-icon" data-icon="clipboard" data-size="20"></span> Info incorrecta
+        </button>
+        <button class="tipo-btn" data-tipo="Otro" onclick="seleccionarTipo(this)">
+          <span class="tipo-icon">🔎</span> Otro
+        </button>
+      </div>
+      <span class="form-error" id="err-tipo" style="display:none">Seleccioná un tipo de problema.</span>
+    </div>
+
+    <div class="form-group">
+      <label>Descripción <span style="font-weight:400;text-transform:none">(opcional)</span></label>
+      <textarea
+        id="descripcion"
+        class="form-textarea"
+        placeholder="Describí el problema con el mayor detalle posible para que los moderadores puedan verificarlo…"
+        rows="4"
+        maxlength="400"
+        oninput="actualizarContador()"
+      ></textarea>
+      <div class="char-count"><span id="char-count">0</span>/400</div>
+    </div>
+
+    <div id="alert-box" style="display:none"></div>
+
+    <div class="report-actions">
+      <a href="javascript:history.back()" class="btn btn--outline btn--sm">Cancelar</a>
+      <button class="btn btn--warn btn--full" id="btn-enviar" onclick="enviarReporte()">
+        Enviar reporte
+      </button>
+    </div>
+  </div>
+
+  <!-- Pantalla de éxito -->
+  <div class="report-card success-screen" id="success-section">
+    <div class="success-icon"><span data-icon="checkCircle" data-size="40"></span></div>
+    <h2>Reporte enviado</h2>
+    <p>Gracias por contribuir a la comunidad. Un moderador revisará el problema y tomará las medidas correspondientes.</p>
+    <a href="index.html" class="btn btn--primary">Volver al mapa</a>
+    <a id="link-cargador" href="cargador.html" class="btn btn--ghost btn--sm" style="margin-top:.5rem">
+      Ver ficha del cargador
+    </a>
+  </div>
+
+</div>
+</main>
+
+<footer class="footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  requireAuth();
+
+  const params  = new URLSearchParams(location.search);
+  const cId     = parseInt(params.get('id'));
+  const cargador = getCargador(cId);
+
+  // Si no existe el cargador, volver al mapa
+  if (!cargador) location.href = 'index.html';
+
+  document.getElementById('charger-name').textContent = cargador.nombre;
+  document.getElementById('link-cargador').href = `cargador.html?id=${cId}`;
+
+  // Back link: si venimos del mapa, volver allí
+  const referrer = document.referrer;
+  const backLink = document.querySelector('.report-back');
+  if (referrer.includes('cargador.html')) {
+    backLink.href = `cargador.html?id=${cId}`;
+    backLink.textContent = '← Volver al cargador';
+  } else {
+    backLink.href = 'index.html';
+    backLink.textContent = '← Volver al mapa';
+  }
+
+  let tipoSeleccionado = null;
+
+  function seleccionarTipo(btn) {
+    document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    tipoSeleccionado = btn.dataset.tipo;
+    document.getElementById('err-tipo').style.display = 'none';
+  }
+
+  function actualizarContador() {
+    const len = document.getElementById('descripcion').value.length;
+    document.getElementById('char-count').textContent = len;
+  }
+
+  function enviarReporte() {
+    if (!tipoSeleccionado) {
+      document.getElementById('err-tipo').style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('btn-enviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+
+    setTimeout(() => {
+      const U = Auth.get();
+      const reportes = getMock('reportes');
+      reportes.push({
+        id: Date.now(),
+        cargador_id: cargador.id,
+        cargador_nombre: cargador.nombre,
+        tipo: tipoSeleccionado,
+        descripcion: document.getElementById('descripcion').value.trim(),
+        usuario: U ? U.nombre : 'Anónimo',
+        fecha: new Date().toISOString().slice(0, 10),
+        estado: 'pendiente',
+      });
+      setMock('reportes', reportes);
+
+      document.getElementById('form-section').style.display = 'none';
+      document.getElementById('success-section').style.display = 'block';
+    }, 600);
+  }
+</script>
+</body>
+</html>

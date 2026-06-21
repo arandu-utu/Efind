@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Find — Mapa de Cargadores</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+  <div class="map-layout">
+
+    <!-- ── Sidebar ───────────────────────────────────────────── -->
+    <aside class="map-sidebar">
+      <div class="map-sidebar__head">
+        <input
+          type="text"
+          id="buscador"
+          class="form-input"
+          placeholder="🔍  Buscar cargador o dirección…"
+          style="font-size:.85rem"
+        >
+      </div>
+
+      <div class="map-sidebar__body">
+
+        <!-- Filtros -->
+        <div class="filter-section">
+          <div class="filter-title">Tipo de conector</div>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="Tipo 2"   checked> Tipo 2</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="CCS2"     checked> CCS2</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="CHAdeMO"  checked> CHAdeMO</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="Schuko"   checked> Schuko</label>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-title">Potencia mínima</div>
+          <select id="f-potencia" class="form-select" style="font-size:.85rem">
+            <option value="0">Cualquiera</option>
+            <option value="7">7 kW +</option>
+            <option value="22">22 kW +</option>
+            <option value="50">50 kW + (DC rápido)</option>
+          </select>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-title">Estado</div>
+          <label class="check-row"><input type="checkbox" class="f-estado" value="disponible" checked> <span class="badge badge-green"  style="font-size:.72rem">Disponible</span></label>
+          <label class="check-row"><input type="checkbox" class="f-estado" value="ocupado"    checked> <span class="badge badge-orange" style="font-size:.72rem">Ocupado</span></label>
+          <label class="check-row"><input type="checkbox" class="f-estado" value="sin_servicio">       <span class="badge badge-gray"   style="font-size:.72rem">Sin servicio</span></label>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-title">Acceso</div>
+          <label class="check-row"><input type="checkbox" class="f-acceso" value="publico"  checked> Público</label>
+          <label class="check-row"><input type="checkbox" class="f-acceso" value="privado"  checked> Privado / Alquiler</label>
+        </div>
+
+        <div style="padding:.6rem 1rem">
+          <button class="btn btn--primary btn--full btn--sm" id="btn-filtrar">Aplicar filtros</button>
+        </div>
+
+        <!-- Lista resultado -->
+        <div class="charger-list" id="charger-list"></div>
+      </div>
+    </aside>
+
+    <!-- ── Mapa ──────────────────────────────────────────────── -->
+    <div id="mapa" class="map-container"></div>
+  </div>
+</main>
+
+<!-- ── Modal detalle rápido ──────────────────────────────────── -->
+<div id="popup-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)cerrarPopup()">
+  <div class="modal" id="popup-content"></div>
+</div>
+
+<footer class="site-footer" id="footer"></footer>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/estimador.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════
+   MAPA PRINCIPAL
+══════════════════════════════════════════════════════════════ */
+
+// Inicializar mapa centrado en Montevideo
+const map = L.map('mapa').setView([-34.9058, -56.1652], 13);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── Íconos por estado ────────────────────────────────────────
+const COLORES = {
+  disponible:   { fill: '#3BB273', border: '#2A8F59' },
+  ocupado:      { fill: '#E76F51', border: '#C4532A' },
+  sin_servicio: { fill: '#9E9E9E', border: '#6B6B6B' },
+};
+
+function crearIcono(estado, publica) {
+  const c = COLORES[estado] || COLORES.sin_servicio;
+  const shape = publica
+    ? `<circle cx="12" cy="12" r="8" fill="${c.fill}" stroke="${c.border}" stroke-width="2"/>`
+    : `<rect x="4" y="4" width="16" height="16" rx="3" fill="${c.fill}" stroke="${c.border}" stroke-width="2"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    ${shape}
+    <path d="M13.2 5.5L10 11h2.5l-.8 3.2L15 8.5h-2.5z" fill="white"/>
+  </svg>`;
+  return L.divIcon({
+    className: '',
+    html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))">${svg}</div>`,
+    iconSize:   [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
+// ── Marcadores ───────────────────────────────────────────────
+let marcadores = [];
+let cargadoresFiltrados = [];
+
+function renderMarcadores(lista) {
+  marcadores.forEach(m => map.removeLayer(m));
+  marcadores = [];
+  lista.forEach(c => {
+    const m = L.marker([c.lat, c.lng], { icon: crearIcono(c.estado, c.publica) })
+      .addTo(map)
+      .on('click', () => abrirPopup(c));
+    marcadores.push(m);
+  });
+}
+
+// ── Lista lateral ────────────────────────────────────────────
+function renderLista(lista) {
+  const el = document.getElementById('charger-list');
+  if (!lista.length) {
+    el.innerHTML = '<p style="font-size:.82rem;color:var(--soft);text-align:center;padding:1rem">Sin resultados para estos filtros.</p>';
+    return;
+  }
+  el.innerHTML = lista.map(c => {
+    const badgeClass = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' }[c.estado];
+    const potMax = Math.max(...c.conectores.map(x => x.potencia));
+    return `
+      <div class="charger-item" onclick="irA(${c.lat},${c.lng},${c.id})">
+        <div class="charger-item__info">
+          <strong>${c.nombre}</strong>
+          <span>${c.direccion.split(',')[0]} · ${potMax} kW</span>
+        </div>
+        <span class="badge ${badgeClass}" style="font-size:.7rem">${c.estado.replace('_',' ')}</span>
+      </div>`;
+  }).join('');
+}
+
+function irA(lat, lng, id) {
+  map.setView([lat, lng], 16);
+  const c = cargadoresFiltrados.find(x => x.id === id);
+  if (c) setTimeout(() => abrirPopup(c), 300);
+}
+
+// ── Filtros ──────────────────────────────────────────────────
+function aplicarFiltros() {
+  const tipos    = [...document.querySelectorAll('.f-tipo:checked')].map(i => i.value);
+  const estados  = [...document.querySelectorAll('.f-estado:checked')].map(i => i.value);
+  const accesos  = [...document.querySelectorAll('.f-acceso:checked')].map(i => i.value);
+  const potMin   = +document.getElementById('f-potencia').value;
+  const busqueda = document.getElementById('buscador').value.toLowerCase();
+
+  cargadoresFiltrados = getMock('cargadores').filter(c => {
+    if (!estados.includes(c.estado)) return false;
+    const esPublico = c.publica ? 'publico' : 'privado';
+    if (!accesos.includes(esPublico)) return false;
+    const tipoOk = c.conectores.some(x => tipos.includes(x.tipo));
+    if (!tipoOk) return false;
+    const potOk  = c.conectores.some(x => x.potencia >= potMin);
+    if (!potOk) return false;
+    if (busqueda && !c.nombre.toLowerCase().includes(busqueda) && !c.direccion.toLowerCase().includes(busqueda)) return false;
+    return true;
+  });
+
+  renderMarcadores(cargadoresFiltrados);
+  renderLista(cargadoresFiltrados);
+}
+
+// ── Popup detalle rápido ─────────────────────────────────────
+function abrirPopup(c) {
+  const badgeClass = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' }[c.estado];
+  const potMax   = Math.max(...c.conectores.map(x => x.potencia));
+  const conTypes = [...new Set(c.conectores.map(x => x.tipo))].join(' · ');
+  const precio   = c.costo_kwh ? `$${c.costo_kwh}/kWh` : 'Gratuito';
+  const colaInfo = c.cola > 0 ? `<span style="color:var(--warn);font-size:.8rem">⏳ ${c.cola} vehículo${c.cola>1?'s':''} en cola</span>` : '';
+  const u = Auth.get();
+
+  document.getElementById('popup-content').innerHTML = `
+    <button class="modal__close" onclick="cerrarPopup()">&times;</button>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
+      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${c.nombre}</h2>
+      <span class="badge ${badgeClass}">${c.estado.replace('_',' ')}</span>
+    </div>
+    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.65rem">${c.direccion}</p>
+    ${colaInfo}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .6rem;font-size:.82rem;margin:.65rem 0">
+      <div><span style="color:var(--soft)">Potencia:</span> <strong>${potMax} kW</strong></div>
+      <div><span style="color:var(--soft)">Conectores:</span> <strong>${conTypes}</strong></div>
+      <div><span style="color:var(--soft)">Horario:</span> <strong>${c.horario}</strong></div>
+      <div><span style="color:var(--soft)">Precio:</span> <strong>${precio}</strong></div>
+    </div>
+    <div style="display:flex;gap:.5rem;margin-top:.9rem;flex-wrap:wrap">
+      <a href="cargador.html?id=${c.id}" class="btn btn--primary btn--sm">Ver detalle</a>
+      <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" class="btn btn--outline btn--sm">Cómo llegar</a>
+      ${u ? `<a href="reportar.html?id=${c.id}" class="btn btn--ghost btn--sm">Reportar</a>` : ''}
+    </div>
+  `;
+  document.getElementById('popup-overlay').style.display = 'flex';
+}
+
+function cerrarPopup() {
+  document.getElementById('popup-overlay').style.display = 'none';
+}
+
+// ── Leyenda ──────────────────────────────────────────────────
+const leyenda = L.control({ position: 'bottomright' });
+leyenda.onAdd = () => {
+  const div = L.DomUtil.create('div', '');
+  div.style.cssText = 'background:white;padding:8px 10px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.8';
+  div.innerHTML = `
+    <strong style="display:block;margin-bottom:4px;color:#1A2E44">Leyenda</strong>
+    <div>🟢 Disponible</div>
+    <div>🟠 Ocupado</div>
+    <div>⚫ Sin servicio</div>
+    <div style="margin-top:4px;color:#5C6B82;display:flex;align-items:center;gap:.3rem;font-size:.8rem"><span style="color:var(--accent)" data-icon="bolt" data-size="14"></span> Público &nbsp;·&nbsp; <span style="color:#8896A5">▪</span> Privado</div>
+  `;
+  return div;
+};
+leyenda.addTo(map);
+
+// ── Eventos ──────────────────────────────────────────────────
+document.getElementById('btn-filtrar').addEventListener('click', aplicarFiltros);
+document.getElementById('buscador').addEventListener('input', aplicarFiltros);
+document.querySelectorAll('.f-tipo,.f-estado,.f-acceso').forEach(el => el.addEventListener('change', aplicarFiltros));
+document.getElementById('f-potencia').addEventListener('change', aplicarFiltros);
+
+// ── Arranque ─────────────────────────────────────────────────
+aplicarFiltros();
+</script>
+</body>
+</html>

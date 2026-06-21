@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle de cargador — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    .stars-display { display:flex; gap:2px; align-items:center; }
+    .stars-display .s { color:#C8D3DF; transition:color .1s; }
+    .stars-display .s.on { color:#F5B800; }
+    .stars-input { display:flex; gap:4px; }
+    .stars-input .star { color:#C8D3DF; cursor:pointer; transition:color .15s, transform .15s; }
+    .stars-input .star.on { color:#F5B800; transform:scale(1.1); }
+    .resena-item { padding:.75rem 0; border-bottom:1px solid var(--border); }
+    .resena-item:last-child { border-bottom:none; }
+    .data-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem .8rem; font-size:.88rem; }
+    .data-grid dt { color:var(--soft); }
+    .data-grid dd { font-weight:700; }
+    .conector-pill {
+      display:inline-flex; align-items:center; gap:.35rem;
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:99px; padding:.25rem .7rem;
+      font-size:.8rem; font-weight:600; margin:.2rem;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+  <div class="container" id="page-content">
+    <div style="display:flex;align-items:center;justify-content:center;height:200px">
+      <span class="spinner"></span>
+    </div>
+  </div>
+</main>
+
+<!-- Modal reseña -->
+<div id="modal-resena" class="modal-overlay center" style="display:none" onclick="if(event.target===this)cerrarResena()">
+  <div class="modal">
+    <button class="modal__close" onclick="cerrarResena()">&times;</button>
+    <h3 class="modal__title">Escribir reseña</h3>
+    <div class="form-group" style="margin-bottom:.85rem">
+      <label class="form-label">Calificación</label>
+      <div class="stars-input" id="stars-input">
+        <!-- Soles de Mayo — populados por initReseñaPicker() -->
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:.85rem">
+      <label class="form-label" for="txt-resena">Comentario (opcional)</label>
+      <textarea id="txt-resena" class="form-textarea" placeholder="Contá tu experiencia con este cargador…"></textarea>
+    </div>
+    <div id="resena-alert" style="display:none;margin-bottom:.75rem"></div>
+    <button class="btn btn--primary btn--full" onclick="enviarResena()">Publicar reseña</button>
+  </div>
+</div>
+
+<!-- Modal reportar -->
+<div id="modal-reporte" class="modal-overlay center" style="display:none" onclick="if(event.target===this)cerrarReporte()">
+  <div class="modal">
+    <button class="modal__close" onclick="cerrarReporte()">&times;</button>
+    <h3 class="modal__title">Reportar problema</h3>
+    <div class="form-group" style="margin-bottom:.8rem">
+      <label class="form-label">Tipo de problema</label>
+      <select id="tipo-reporte" class="form-select">
+        <option>Fuera de servicio</option>
+        <option>Conector dañado</option>
+        <option>Precio incorrecto</option>
+        <option>Acceso bloqueado</option>
+        <option>Otro</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:.8rem">
+      <label class="form-label">Descripción (opcional)</label>
+      <textarea id="txt-reporte" class="form-textarea" placeholder="Describí el problema…"></textarea>
+    </div>
+    <button class="btn btn--warn btn--full" onclick="enviarReporte()">Enviar reporte</button>
+  </div>
+</div>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/estimador.js"></script>
+<script>
+const ID = +cargadorIdFromURL();
+const C  = getCargador(ID);
+const U  = Auth.get();
+
+if (!C) {
+  document.getElementById('page-content').innerHTML = `
+    <div style="text-align:center;padding:4rem 1rem">
+      ${ICONS.warning(56)}
+      <h2>Cargador no encontrado</h2>
+      <a href="index.html" class="btn btn--primary" style="margin-top:1rem">Volver al mapa</a>
+    </div>`;
+} else {
+  renderPage();
+}
+
+function stars(n, max=5) {
+  return Array.from({length:max}, (_,i) =>
+    `<span class="s ${i<n?'on':''}">${solSVG(15)}</span>`
+  ).join('');
+}
+
+function initReseñaPicker() {
+  const el = document.getElementById('stars-input');
+  if (!el) return;
+  el.innerHTML = [1,2,3,4,5].map(v =>
+    `<span class="star" data-v="${v}" onclick="setStar(${v})"
+           onmouseenter="hoverResena(${v})" onmouseleave="unhoverResena()"
+           style="color:#C8D3DF">${solSVG(28)}</span>`
+  ).join('');
+}
+function hoverResena(v) {
+  document.querySelectorAll('#stars-input .star').forEach(s => {
+    s.style.color = +s.dataset.v <= v ? '#FFCC30' : '#C8D3DF';
+  });
+}
+function unhoverResena() {
+  document.querySelectorAll('#stars-input .star').forEach(s => {
+    s.style.color = +s.dataset.v <= estrellasSel ? '#F5B800' : '#C8D3DF';
+  });
+}
+
+function promEstrellas(resenas) {
+  if (!resenas.length) return 0;
+  return resenas.reduce((s,r) => s + r.estrellas, 0) / resenas.length;
+}
+
+function renderPage() {
+  const badgeMap  = { disponible:'badge-green', ocupado:'badge-orange', sin_servicio:'badge-gray' };
+  const labelMap  = { disponible:'Disponible', ocupado:'Ocupado', sin_servicio:'Sin servicio' };
+  const potMax    = Math.max(...C.conectores.map(x=>x.potencia));
+  const prom      = promEstrellas(C.resenas);
+  const precio    = C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito';
+  const colaText  = C.cola > 0 ? `⏳ ${C.cola} vehículo${C.cola>1?'s':''} en cola` : 'Sin espera';
+  const colaColor = C.cola > 0 ? 'var(--warn)' : 'var(--green)';
+
+  document.title = C.nombre + ' — E-Find';
+
+  document.getElementById('page-content').innerHTML = `
+    <!-- Breadcrumb -->
+    <div style="font-size:.8rem;color:var(--soft);margin-bottom:1rem">
+      <a href="index.html">Mapa</a> › ${C.nombre}
+    </div>
+
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
+
+      <!-- ── Columna principal ──────────────────────────────── -->
+      <div style="flex:1;min-width:300px">
+
+        <!-- Encabezado -->
+        <div style="display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
+          <h1 style="font-size:1.45rem;font-weight:900;color:var(--nav);flex:1">${C.nombre}</h1>
+          <span class="badge ${badgeMap[C.estado]}">${labelMap[C.estado]}</span>
+        </div>
+        <p style="color:var(--soft);font-size:.9rem;margin-bottom:1rem">${C.direccion}</p>
+
+        <!-- Cola -->
+        <div style="font-size:.88rem;font-weight:600;color:${colaColor};margin-bottom:1.25rem">${colaText}</div>
+
+        <!-- Datos técnicos -->
+        <div class="card" style="margin-bottom:1.25rem">
+          <div class="card__title">Información técnica</div>
+          <dl class="data-grid">
+            <dt>Horario</dt><dd>${C.horario}</dd>
+            <dt>Precio</dt><dd>${precio}</dd>
+            <dt>Potencia máx.</dt><dd>${potMax} kW</dd>
+            <dt>Tipo de acceso</dt><dd>${C.publica ? 'Público' : 'Privado / Alquiler'}</dd>
+            <dt>Propietario</dt><dd>${(() => { const o = getUsuario(C.propietario_id); return o ? o.nombre + ' ' + renderStars(o.calificacion_promedio, o.num_calificaciones) : '—'; })()}</dd>
+          </dl>
+          <div style="margin-top:.9rem">
+            <div style="font-size:.78rem;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Conectores disponibles</div>
+            ${C.conectores.map(x => `
+              <span class="conector-pill">
+                ${ICONS.bolt(14)} ${x.tipo} · ${x.potencia} kW
+              </span>`).join('')}
+          </div>
+        </div>
+
+        <!-- Reseñas -->
+        <div class="card" style="margin-bottom:1.25rem">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="card__title" style="margin-bottom:0">Reseñas</div>
+            ${U ? `<button class="btn btn--outline btn--sm" onclick="abrirResena()">+ Escribir reseña</button>` : ''}
+          </div>
+
+          ${C.resenas.length ? `
+            <div style="display:flex;align-items:center;gap:.75rem;margin:.9rem 0">
+              <div style="font-size:2.5rem;font-weight:900;color:var(--nav)">${prom.toFixed(1)}</div>
+              <div>
+                <div class="stars-display">${stars(Math.round(prom))}</div>
+                <div style="font-size:.8rem;color:var(--soft)">${C.resenas.length} reseña${C.resenas.length>1?'s':''}</div>
+              </div>
+            </div>
+            <hr class="divider">
+            ${C.resenas.map(r => `
+              <div class="resena-item">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <strong style="font-size:.9rem">${r.usuario}</strong>
+                  <span style="font-size:.78rem;color:var(--soft)">${r.fecha}</span>
+                </div>
+                <div class="stars-display" style="margin:.3rem 0">${stars(r.estrellas)}</div>
+                <p style="font-size:.85rem;color:var(--text)">${r.texto}</p>
+              </div>`).join('')}
+          ` : `<p style="font-size:.88rem;color:var(--soft);margin-top:.75rem">Sin reseñas aún. ¡Sé el primero!</p>`}
+        </div>
+
+        <!-- Acciones -->
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <a href="https://maps.google.com/?q=${C.lat},${C.lng}" target="_blank" class="btn btn--outline">
+            ${ICONS.pin(14)} Cómo llegar
+          </a>
+          ${U ? `
+            <button class="btn btn--warn" onclick="abrirReporte()">${ICONS.warning(15)} Reportar</button>
+            ${!C.publica ? `<a href="reservar.html?id=${C.id}" class="btn btn--green">${ICONS.bolt(15)} Reservar carga</a>` : ''}
+          ` : `<a href="login.html" class="btn btn--primary">Iniciar sesión para más opciones</a>`}
+        </div>
+      </div>
+
+      <!-- ── Columna lateral ────────────────────────────────── -->
+      <div style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:1rem">
+
+        <!-- Mini mapa -->
+        <div id="mini-mapa" style="height:200px;border-radius:var(--radius-lg);overflow:hidden;border:1px solid var(--border)"></div>
+
+        <!-- Estimador -->
+        <div class="card">
+          <div class="card__title"><span data-icon="bolt" data-size="15"></span> Estimador de carga</div>
+          <div id="estimador-widget"></div>
+        </div>
+
+        <!-- Crowdsourcing -->
+        <div class="card" id="card-crowd" ${!U?'style="opacity:.65;pointer-events:none"':''}>
+          <div class="card__title">📡 Reportar estado en tiempo real</div>
+          ${!U ? '<p style="font-size:.82rem;color:var(--soft)">Iniciá sesión para reportar.</p>' : `
+            <div style="display:flex;flex-direction:column;gap:.5rem">
+              <button class="btn btn--green btn--sm" onclick="reportarEstado('disponible')">✅ Disponible</button>
+              <button class="btn btn--warn btn--sm"  onclick="reportarEstado('ocupado')">🔴 Ocupado</button>
+              <button class="btn btn--ghost btn--sm" onclick="reportarEstado('sin_servicio')">⚫ Fuera de servicio</button>
+            </div>
+            <hr class="divider">
+            <div class="form-group">
+              <label class="form-label">Cola de espera</label>
+              <select id="sel-cola" class="form-select" style="font-size:.85rem">
+                <option value="0">Sin cola</option>
+                <option value="1">1 vehículo</option>
+                <option value="2">2 vehículos</option>
+                <option value="3">3 o más</option>
+              </select>
+              <button class="btn btn--primary btn--sm btn--full" style="margin-top:.5rem" onclick="reportarCola()">
+                Actualizar cola
+              </button>
+            </div>
+          `}
+          <div id="crowd-feedback" style="display:none;margin-top:.75rem"></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  /* Mini mapa */
+  const mm = L.map('mini-mapa', { zoomControl:true, scrollWheelZoom:false })
+              .setView([C.lat, C.lng], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution:'&copy; OpenStreetMap' }).addTo(mm);
+  L.marker([C.lat, C.lng]).addTo(mm);
+
+  /* Estimador */
+  const vehsUsuario = U ? getMock('vehiculos').filter(v => v.usuario_id === U.id) : [];
+  montarEstimador(document.getElementById('estimador-widget'), C, vehsUsuario);
+}
+
+/* ── Modal reseña ──────────────────────────────────────────── */
+let estrellasSel = 0;
+
+function abrirResena() {
+  if (!U) { location.href = 'login.html'; return; }
+  estrellasSel = 0;
+  initReseñaPicker();
+  setStar(0);
+  document.getElementById('txt-resena').value = '';
+  document.getElementById('resena-alert').style.display = 'none';
+  document.getElementById('modal-resena').style.display = 'flex';
+}
+function cerrarResena() { document.getElementById('modal-resena').style.display = 'none'; }
+
+function setStar(n) {
+  estrellasSel = n;
+  document.querySelectorAll('#stars-input .star').forEach((s, i) => {
+    s.style.color = i < n ? '#F5B800' : '#C8D3DF';
+    s.style.transform = i < n ? 'scale(1.08)' : 'scale(1)';
+  });
+}
+
+function enviarResena() {
+  if (!estrellasSel) {
+    const al = document.getElementById('resena-alert');
+    al.className = 'alert alert-warn';
+    al.innerHTML = 'Seleccioná una calificación.';
+    al.style.display = 'flex';
+    return;
+  }
+  const cargadores = getMock('cargadores');
+  const idx = cargadores.findIndex(x => x.id === C.id);
+  cargadores[idx].resenas.unshift({
+    usuario: U.nombre, estrellas: estrellasSel,
+    texto: document.getElementById('txt-resena').value || '—',
+    fecha: new Date().toISOString().slice(0,10),
+  });
+  setMock('cargadores', cargadores);
+  cerrarResena();
+  renderPage();
+}
+
+/* ── Modal reporte ─────────────────────────────────────────── */
+function abrirReporte()  { document.getElementById('modal-reporte').style.display = 'flex'; }
+function cerrarReporte() { document.getElementById('modal-reporte').style.display = 'none'; }
+
+function enviarReporte() {
+  const reportes = getMock('reportes');
+  reportes.push({
+    id: Date.now(), cargador_id: C.id,
+    cargador_nombre: C.nombre,
+    tipo: document.getElementById('tipo-reporte').value,
+    usuario: U.nombre,
+    fecha: new Date().toISOString().slice(0,10),
+    estado: 'pendiente',
+  });
+  setMock('reportes', reportes);
+  cerrarReporte();
+  mostrarFeedback('crowd-feedback', '✓ Reporte enviado, gracias por contribuir.', 'success');
+}
+
+/* ── Crowdsourcing ─────────────────────────────────────────── */
+function reportarEstado(estado) {
+  const lista = getMock('cargadores');
+  const idx = lista.findIndex(x => x.id === C.id);
+  lista[idx].estado = estado;
+  setMock('cargadores', lista);
+  mostrarFeedback('crowd-feedback', `✓ Estado actualizado a "${estado.replace('_',' ')}".`, 'success');
+}
+function reportarCola() {
+  const cola = +document.getElementById('sel-cola').value;
+  const lista = getMock('cargadores');
+  const idx = lista.findIndex(x => x.id === C.id);
+  lista[idx].cola = cola;
+  setMock('cargadores', lista);
+  mostrarFeedback('crowd-feedback', `✓ Cola actualizada a ${cola} vehículo${cola!==1?'s':''}.`, 'success');
+}
+
+function mostrarFeedback(elId, msg, tipo) {
+  const el = document.getElementById(elId);
+  el.className = `alert alert-${tipo}`;
+  el.innerHTML = msg;
+  el.style.display = 'flex';
+  setTimeout(() => el.style.display='none', 3000);
+}
+</script>
+</body>
+</html>

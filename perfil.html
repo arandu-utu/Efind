@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi perfil — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<main class="main-content">
+<div class="container">
+  <h1 style="font-size:1.35rem;font-weight:900;color:var(--nav);margin-bottom:1.5rem">Mi perfil</h1>
+
+  <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
+
+    <!-- Avatar sidebar -->
+    <div class="card" style="width:200px;flex-shrink:0;text-align:center;padding:1.5rem 1rem">
+      <div style="width:70px;height:70px;border-radius:50%;background:var(--accent);
+                  display:flex;align-items:center;justify-content:center;
+                  font-size:2rem;font-weight:900;color:#fff;margin:0 auto .75rem">
+        <span id="avatar-big"></span>
+      </div>
+      <div id="user-nombre" style="font-weight:800;font-size:1rem;color:var(--nav)"></div>
+      <div id="user-rol" style="font-size:.8rem;color:var(--soft);margin-top:.2rem"></div>
+      <div id="user-stars-sidebar" style="margin-top:.5rem;font-size:.85rem"></div>
+      <hr class="divider">
+      <button class="btn btn--warn btn--sm btn--full" onclick="logout()"><span data-icon="logout" data-size="14"></span> Cerrar sesión</button>
+    </div>
+
+    <!-- Contenido principal -->
+    <div style="flex:1;min-width:280px">
+      <div class="tabs" id="tabs">
+        <button class="tab-btn active" onclick="switchTab(0,this)">Perfil</button>
+        <button class="tab-btn" onclick="switchTab(1,this)">Mis vehículos</button>
+        <button class="tab-btn" onclick="switchTab(2,this)">Mis cargadores</button>
+        <button class="tab-btn" onclick="switchTab(3,this)">Historial</button>
+        <button class="tab-btn" onclick="switchTab(4,this)">Calificaciones</button>
+      </div>
+
+      <!-- TAB 4: Calificaciones -->
+      <div class="tab-panel" id="tab-4">
+        <div class="card">
+          <div class="card__title">Mi reputación</div>
+          <div id="rating-summary-block"></div>
+          <div id="calificaciones-list"></div>
+        </div>
+      </div>
+
+      <!-- TAB 0: Perfil -->
+      <div class="tab-panel active" id="tab-0">
+        <div class="card">
+          <div class="card__title">Datos personales</div>
+          <dl style="display:grid;grid-template-columns:140px 1fr;gap:.5rem .5rem;font-size:.9rem">
+            <dt style="color:var(--soft)">Nombre</dt>      <dd id="p-nombre" style="font-weight:600"></dd>
+            <dt style="color:var(--soft)">Email</dt>       <dd id="p-email"  style="font-weight:600"></dd>
+            <dt style="color:var(--soft)">CI / RUT</dt>    <dd id="p-ci"     style="font-weight:600"></dd>
+            <dt style="color:var(--soft)">Rol</dt>         <dd id="p-rol"    style="font-weight:600"></dd>
+            <dt style="color:var(--soft)" id="lbl-emp">Empresa</dt><dd id="p-emp" style="font-weight:600;display:none"></dd>
+          </dl>
+        </div>
+      </div>
+
+      <!-- TAB 1: Vehículos -->
+      <div class="tab-panel" id="tab-1">
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card__title">Mis vehículos</div>
+          <div id="lista-vehiculos"></div>
+        </div>
+        <div class="card">
+          <div class="card__title">+ Agregar vehículo</div>
+          <div style="display:flex;flex-direction:column;gap:.7rem" id="form-vehiculo">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">
+              <div class="form-group">
+                <label class="form-label">Marca</label>
+                <input type="text" id="v-marca" class="form-input" placeholder="Tesla">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Modelo</label>
+                <input type="text" id="v-modelo" class="form-input" placeholder="Model 3">
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">
+              <div class="form-group">
+                <label class="form-label">Capacidad (kWh)</label>
+                <input type="number" id="v-cap" class="form-input" placeholder="60" min="5" max="200" step="0.5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Tipo de conector</label>
+                <select id="v-conector" class="form-select">
+                  <option>CCS2</option><option>Tipo 2</option>
+                  <option>CHAdeMO</option><option>Schuko</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn--primary btn--sm" onclick="agregarVehiculo()">Guardar vehículo</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Mis cargadores -->
+      <div class="tab-panel" id="tab-2">
+        <div class="card">
+          <div class="card__title">Mis puntos de carga</div>
+          <div id="lista-mis-cargadores"></div>
+          <a href="agregar.html" class="btn btn--green btn--sm" style="margin-top:.75rem">+ Agregar cargador</a>
+        </div>
+      </div>
+
+      <!-- TAB 3: Historial -->
+      <div class="tab-panel" id="tab-3">
+        <div class="card">
+          <div class="card__title">Mis transacciones</div>
+          <div id="lista-trans"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAuth();
+const U = Auth.get();
+
+/* Sidebar */
+document.getElementById('avatar-big').textContent = U.avatar;
+document.getElementById('user-nombre').textContent = U.nombre;
+const roles = {particular:'Usuario Particular',empresa:'Empresa',moderador:'Moderador',admin:'Administrador'};
+document.getElementById('user-rol').textContent = roles[U.rol] || U.rol;
+
+/* Tab perfil */
+document.getElementById('p-nombre').textContent = U.nombre;
+document.getElementById('p-email').textContent  = U.email;
+document.getElementById('p-ci').textContent     = U.ci_rut;
+document.getElementById('p-rol').textContent    = roles[U.rol] || U.rol;
+if (U.empresa) {
+  document.getElementById('lbl-emp').style.display = '';
+  document.getElementById('p-emp').style.display   = '';
+  document.getElementById('p-emp').textContent      = U.empresa;
+}
+
+/* Rating sidebar */
+document.getElementById('user-stars-sidebar').innerHTML = renderStars(U.calificacion_promedio, U.num_calificaciones);
+
+/* Tab Calificaciones */
+function renderCalificaciones() {
+  const all = getMock('calificaciones').filter(c => c.para_usuario_id === U.id);
+  const block = document.getElementById('rating-summary-block');
+  const list  = document.getElementById('calificaciones-list');
+
+  if (all.length === 0) {
+    block.innerHTML = '<p style="color:var(--soft);font-size:.9rem">Aún no tenés calificaciones de otros usuarios.</p>';
+    list.innerHTML = '';
+    return;
+  }
+
+  const prom = (all.reduce((s,c) => s + c.puntos, 0) / all.length).toFixed(1);
+  const filled = Math.round(prom);
+  block.innerHTML = \`
+    <div class="rating-summary">
+      <div>
+        <div class="rating-big-num">\${prom}</div>
+        <div class="rating-big-stars">\${Array.from({length:5},(_,i)=>`<span style="color:\${i<filled?'#F5B800':'#C8D3DF'}">\${solSVG(26)}</span>`).join('')}</div>
+      </div>
+      <div>
+        <div style="font-weight:600;font-size:.9rem">Calificación promedio</div>
+        <div class="rating-big-count">\${all.length} calificación\${all.length!==1?'es':''} recibida\${all.length!==1?'s':''}</div>
+      </div>
+    </div>
+  \`;
+
+  const usuarios = getMock('usuarios');
+  list.innerHTML = all.map(c => {
+    const de = usuarios.find(u => u.id === c.de_usuario_id);
+    const av = de ? de.avatar : '?';
+    const nm = de ? de.nombre : 'Usuario';
+    const stars = Array.from({length:5},(_,i)=>`<span style=\"color:\${i<c.puntos?'#F5B800':'#C8D3DF'}\">\${solSVG(14)}</span>`).join('');
+    const tipo = c.tipo === 'propietario_a_cliente' ? 'Como cliente' : 'Como propietario';
+    return \`
+      <div class="cal-item">
+        <div class="cal-avatar">\${av}</div>
+        <div class="cal-body">
+          <div class="cal-header">
+            <span class="cal-name">\${nm}</span>
+            <span class="cal-stars">\${stars}</span>
+            <span class="cal-date">\${c.fecha}</span>
+          </div>
+          <div class="cal-tipo">\${tipo}</div>
+          \${c.comentario ? \`<div class="cal-text">"\${c.comentario}"</div>\` : ''}
+        </div>
+      </div>
+    \`;
+  }).join('');
+}
+renderCalificaciones();
+
+/* Tabs */
+function switchTab(n, btn) {
+  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', i===n));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (n===1) renderVehiculos();
+  if (n===2) renderMisCargadores();
+  if (n===3) renderHistorial();
+}
+
+/* Vehículos */
+function renderVehiculos() {
+  const vehs = getMock('vehiculos').filter(v=>v.usuario_id===U.id);
+  const el = document.getElementById('lista-vehiculos');
+  el.innerHTML = vehs.length ? `
+    <table class="data-table">
+      <thead><tr><th>Marca</th><th>Modelo</th><th>Capacidad</th><th>Conector</th><th></th></tr></thead>
+      <tbody>
+        ${vehs.map(v=>`
+        <tr>
+          <td>${v.marca}</td><td>${v.modelo}</td>
+          <td>${v.capacidad_kwh} kWh</td>
+          <td>${v.conector}</td>
+          <td><button class="btn btn--ghost btn--sm" onclick="eliminarVehiculo(${v.id})">${ICONS.x(14)}</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<p style="font-size:.88rem;color:var(--soft)">No tenés vehículos registrados.</p>';
+}
+
+function agregarVehiculo() {
+  const marca = document.getElementById('v-marca').value.trim();
+  const modelo= document.getElementById('v-modelo').value.trim();
+  const cap   = +document.getElementById('v-cap').value;
+  const conector = document.getElementById('v-conector').value;
+  if (!marca || !modelo || !cap) { alert('Completá todos los campos.'); return; }
+  const lista = getMock('vehiculos');
+  lista.push({ id:Date.now(), usuario_id:U.id, marca, modelo, capacidad_kwh:cap, conector });
+  setMock('vehiculos', lista);
+  document.getElementById('v-marca').value  = '';
+  document.getElementById('v-modelo').value = '';
+  document.getElementById('v-cap').value    = '';
+  renderVehiculos();
+}
+
+function eliminarVehiculo(id) {
+  if (!confirm('¿Eliminar este vehículo?')) return;
+  setMock('vehiculos', getMock('vehiculos').filter(v=>v.id!==id));
+  renderVehiculos();
+}
+
+/* Mis cargadores */
+function renderMisCargadores() {
+  const lista = getMock('cargadores').filter(c=>c.propietario_id===U.id);
+  const el = document.getElementById('lista-mis-cargadores');
+  const badgeMap = {disponible:'badge-green',ocupado:'badge-orange',sin_servicio:'badge-gray'};
+  el.innerHTML = lista.length ? `
+    <table class="data-table">
+      <thead><tr><th>Nombre</th><th>Estado</th><th>Potencia</th><th></th></tr></thead>
+      <tbody>
+        ${lista.map(c=>`<tr>
+          <td>${c.nombre}</td>
+          <td><span class="badge ${badgeMap[c.estado]}">${c.estado}</span></td>
+          <td>${Math.max(...c.conectores.map(x=>x.potencia))} kW</td>
+          <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : '<p style="font-size:.88rem;color:var(--soft)">No tenés cargadores registrados.</p>';
+}
+
+/* Historial */
+function renderHistorial() {
+  const trans = getMock('transacciones').filter(t=>t.usuario_id===U.id);
+  const el = document.getElementById('lista-trans');
+  el.innerHTML = trans.length ? `
+    <table class="data-table">
+      <thead><tr><th>Recibo</th><th>Cargador</th><th>kWh</th><th>Total</th><th>Fecha</th></tr></thead>
+      <tbody>
+        ${trans.map(t=>{
+          const c = getCargador(t.cargador_id);
+          return `<tr>
+            <td style="font-family:monospace;font-size:.8rem">${t.recibo}</td>
+            <td>${c?.nombre||'—'}</td>
+            <td>${t.kwh||'—'}</td>
+            <td>${t.monto_total>0?'$'+t.monto_total+' UYU':'Gratis'}</td>
+            <td>${t.fecha}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>` : '<p style="font-size:.88rem;color:var(--soft)">Sin transacciones aún.</p>';
+}
+
+function logout() {
+  Auth.logout();
+  location.href = 'index.html';
+}
+</script>
+</body>
+</html>

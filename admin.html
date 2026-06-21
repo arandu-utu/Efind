@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<main class="main-content">
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-section">Principal</div>
+    <a href="admin.html"    class="sidebar-link active"><span class="ico" data-icon="chart" data-size="18"></span><span>Dashboard</span></a>
+    <a href="admin.html#cargadores" class="sidebar-link"><span class="ico" data-icon="bolt" data-size="18"></span><span>Cargadores</span></a>
+    <a href="usuarios.html" class="sidebar-link"><span class="ico" data-icon="users" data-size="18"></span><span>Usuarios</span></a>
+    <div class="sidebar-section">Moderación</div>
+    <a href="admin.html#resenas"  class="sidebar-link"><span class="ico" data-icon="sun" data-size="18"></span><span>Reseñas</span></a>
+    <a href="admin.html#reportes" class="sidebar-link"><span class="ico" data-icon="warning" data-size="18"></span><span>Reportes</span></a>
+    <div class="sidebar-section">Sistema</div>
+    <a href="index.html"  class="sidebar-link"><span class="ico" data-icon="globe" data-size="18"></span><span>Ver mapa</span></a>
+  </aside>
+
+  <!-- Contenido -->
+  <div class="admin-content">
+    <h1 class="admin-title">Dashboard</h1>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.25rem;margin-top:1.25rem;flex-wrap:wrap">
+
+      <!-- Gráfico mensual -->
+      <div class="card">
+        <div class="card__title"><span data-icon="chartUp" data-size="16"></span> Cargadores registrados por mes (2026)</div>
+        <div class="bar-chart" id="bar-chart"></div>
+        <div id="bar-labels" style="display:flex;gap:6px;margin-top:4px"></div>
+      </div>
+
+      <!-- Distribución roles -->
+      <div class="card">
+        <div class="card__title"><span data-icon="users" data-size="16"></span> Distribución por rol</div>
+        <canvas id="donut-canvas" width="160" height="160" style="display:block;margin:0 auto"></canvas>
+        <div id="donut-legend" style="margin-top:.75rem;font-size:.8rem"></div>
+      </div>
+    </div>
+
+    <!-- Cola de reseñas -->
+    <div class="card" id="resenas" style="margin-top:1.25rem">
+      <div class="card__title"><span data-icon="sun" data-size="16"></span> Reseñas pendientes de moderación</div>
+      <div id="lista-resenas-pend"></div>
+    </div>
+
+    <!-- Reportes abiertos -->
+    <div class="card" id="reportes" style="margin-top:1.25rem">
+      <div class="card__title"><span data-icon="warning" data-size="16"></span> Reportes abiertos</div>
+      <div id="lista-reportes"></div>
+    </div>
+
+    <!-- Últimos cargadores -->
+    <div class="card" id="cargadores" style="margin-top:1.25rem">
+      <div class="card__title"><span data-icon="bolt" data-size="16"></span> Últimos cargadores registrados</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Nombre</th><th>Dirección</th><th>Estado</th><th>Conectores</th><th></th></tr></thead>
+          <tbody id="tbody-cargadores"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAdmin();
+
+const stats   = MOCK.stats;
+const usuarios = getMock('usuarios');
+
+/* ── KPIs ───────────────────────────────────────────────────── */
+const kpis = [
+  { label:'Cargadores totales', value: getMock('cargadores').length, diff:'+1 este mes', ico:'bolt' },
+  { label:'Usuarios registrados', value: usuarios.length, diff:'+2 este mes', ico:'user' },
+  { label:'Reseñas pendientes', value: getMock('resenas_pendientes').filter(r=>r.estado==='pendiente').length, diff:'', ico:'sun' },
+  { label:'Reportes abiertos', value: getMock('reportes').filter(r=>r.estado==='pendiente').length, diff:'', ico:'warning' },
+];
+document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
+  <div class="kpi-card">
+    <div class="kpi-label">${ICONS[k.ico]?.(20)||k.ico} ${k.label}</div>
+    <div class="kpi-value">${k.value}</div>
+    ${k.diff ? `<div class="kpi-diff">${k.diff}</div>` : ''}
+  </div>`).join('');
+
+/* ── Gráfico de barras ──────────────────────────────────────── */
+const datos = stats.cargadores_por_mes;
+const maxD  = Math.max(...datos, 1);
+document.getElementById('bar-chart').innerHTML = datos.map((v,i)=>`
+  <div class="bar-col">
+    <div class="bar" style="height:${Math.round((v/maxD)*100)}px;background:${v?'var(--accent)':'var(--border)'}"></div>
+  </div>`).join('');
+document.getElementById('bar-labels').innerHTML = stats.meses.map(m=>`
+  <div class="bar-col"><div class="bar-label">${m}</div></div>`).join('');
+
+/* ── Donut simple con Canvas ─────────────────────────────────── */
+const rolesCount = { particular:0, empresa:0, moderador:0, admin:0 };
+usuarios.forEach(u => rolesCount[u.rol] = (rolesCount[u.rol]||0)+1);
+const colores = ['#2D7DD2','#3BB273','#E76F51','#1A2E44'];
+const roleNames = ['Particular','Empresa','Moderador','Admin'];
+const vals = Object.values(rolesCount);
+const total = vals.reduce((a,b)=>a+b,0)||1;
+
+const canvas = document.getElementById('donut-canvas');
+const ctx    = canvas.getContext('2d');
+let ang = -Math.PI/2;
+vals.forEach((v,i)=>{
+  const slice = (v/total)*Math.PI*2;
+  ctx.beginPath();
+  ctx.moveTo(80,80);
+  ctx.arc(80,80,70,ang,ang+slice);
+  ctx.closePath();
+  ctx.fillStyle = colores[i];
+  ctx.fill();
+  ang += slice;
+});
+/* Donut hole */
+ctx.beginPath();
+ctx.arc(80,80,42,0,Math.PI*2);
+ctx.fillStyle='#fff';
+ctx.fill();
+ctx.fillStyle='#1A2E44';
+ctx.font='bold 22px system-ui';
+ctx.textAlign='center';
+ctx.fillText(total,80,85);
+
+document.getElementById('donut-legend').innerHTML = roleNames.map((n,i)=>`
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+    <span style="width:10px;height:10px;border-radius:2px;background:${colores[i]};display:inline-block"></span>
+    ${n}: <strong>${vals[i]}</strong>
+  </div>`).join('');
+
+/* ── Reseñas pendientes ─────────────────────────────────────── */
+function renderResenas() {
+  const pend = getMock('resenas_pendientes').filter(r=>r.estado==='pendiente');
+  const el = document.getElementById('lista-resenas-pend');
+  el.innerHTML = pend.length ? `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Usuario</th><th>Cargador</th><th>Estrellas</th><th>Comentario</th><th>Acciones</th></tr></thead>
+        <tbody>
+          ${pend.map(r=>`<tr>
+            <td>${r.usuario}</td>
+            <td>${r.cargador_nombre}</td>
+            <td><span style="display:inline-flex;align-items:center;gap:1px">${Array.from({length:5},(_,i)=>`<span style="color:${i<r.estrellas?'#F5B800':'#C8D3DF'}">${solSVG(14)}</span>`).join('')}</span></td>
+            <td style="font-size:.82rem">${r.texto}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn--green btn--sm" onclick="modResena(${r.id},'aprobada')">${ICONS.checkCircle(14)} Aprobar</button>
+              <button class="btn btn--warn btn--sm"  onclick="modResena(${r.id},'rechazada')">${ICONS.xCircle(14)} Rechazar</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : '<p style="font-size:.88rem;color:var(--soft)">Sin reseñas pendientes. ✓</p>';
+}
+
+function modResena(id, estado) {
+  const lista = getMock('resenas_pendientes');
+  const idx = lista.findIndex(r=>r.id===id);
+  lista[idx].estado = estado;
+  setMock('resenas_pendientes', lista);
+  renderResenas();
+}
+
+/* ── Reportes ───────────────────────────────────────────────── */
+function renderReportes() {
+  const pend = getMock('reportes').filter(r=>r.estado==='pendiente');
+  const el = document.getElementById('lista-reportes');
+  el.innerHTML = pend.length ? `
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Cargador</th><th>Tipo</th><th>Reportado por</th><th>Credibilidad</th><th>Fecha</th><th>Acción</th></tr></thead>
+        <tbody>
+          ${pend.map(r=>`<tr>
+            <td><a href="cargador.html?id=${r.cargador_id}">${r.cargador_nombre}</a></td>
+            <td>${r.tipo}</td>
+            <td>${r.usuario}</td>
+            <td>${credibilidadBadge(r.usuario_id)}</td>
+            <td>${r.fecha}</td>
+            <td><button class="btn btn--green btn--sm" onclick="resolverReporte(${r.id})">Resolver</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : '<p style="font-size:.88rem;color:var(--soft)">Sin reportes pendientes. ✓</p>';
+}
+
+function resolverReporte(id) {
+  const lista = getMock('reportes');
+  const idx = lista.findIndex(r=>r.id===id);
+  lista[idx].estado = 'resuelto';
+  setMock('reportes', lista);
+  renderReportes();
+}
+
+/* ── Últimos cargadores ─────────────────────────────────────── */
+const badgeMap = {disponible:'badge-green',ocupado:'badge-orange',sin_servicio:'badge-gray'};
+document.getElementById('tbody-cargadores').innerHTML =
+  getMock('cargadores').slice(-5).reverse().map(c=>`<tr>
+    <td><a href="cargador.html?id=${c.id}">${c.nombre}</a></td>
+    <td style="font-size:.82rem;color:var(--soft)">${c.direccion}</td>
+    <td><span class="badge ${badgeMap[c.estado]}">${c.estado}</span></td>
+    <td style="font-size:.82rem">${c.conectores.map(x=>x.tipo).join(', ')}</td>
+    <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
+  </tr>`).join('');
+
+renderResenas();
+renderReportes();
+</script>
+</body>
+</html>

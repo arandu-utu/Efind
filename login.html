@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+<div class="auth-wrap">
+
+  <!-- Branding -->
+  <div class="auth-brand">
+    <a href="index.html" style="display:inline-block;margin-bottom:.5rem">
+      <img src="img/efind-nav.png" alt="E-Find" class="brand-logo">
+    </a>
+    <p class="auth-tagline">La red colaborativa de cargadores para vehículos eléctricos en Uruguay.</p>
+    <ul class="auth-features">
+      <li>Encontrá cargadores cerca de vos en tiempo real</li>
+      <li>Estimá el tiempo de carga de tu EV</li>
+      <li>Compartí puntos de carga con la comunidad</li>
+      <li>Alquilá tu cargador y generá ingresos</li>
+    </ul>
+    <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,.07);border-radius:10px">
+      <p style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:.5rem">Usuarios de prueba:</p>
+      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">admin@efind.com.uy · <em>Admin</em></p>
+      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">carlos@gmail.com · <em>Particular</em></p>
+      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">sofia@empresa.com.uy · <em>Empresa</em></p>
+      <p style="font-size:.8rem;color:rgba(255,255,255,.4);margin-top:.35rem">(cualquier contraseña)</p>
+    </div>
+    <div style="margin-top:auto;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:.6rem">
+      <span style="font-size:.75rem;color:rgba(255,255,255,.4)">Desarrollado por</span>
+      <img src="img/arandu-dark.png" alt="Arandú" style="height:26px;opacity:.7">
+    </div>
+  </div>
+
+  <!-- Panel -->
+  <div class="auth-panel">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active">Iniciar sesión</button>
+      <button class="tab-btn" onclick="location.href='registro.html'">Registrarse</button>
+    </div>
+
+    <div id="alert-box" style="display:none"></div>
+
+    <form id="login-form" style="display:flex;flex-direction:column;gap:.9rem" novalidate>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Correo electrónico</label>
+        <input type="email" id="email" class="form-input"
+               placeholder="tucorreo@ejemplo.com"
+               autocomplete="email" required>
+        <span class="form-error" id="err-email">Ingresá un email válido.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="pwd">Contraseña</label>
+        <div class="input-pwd">
+          <input type="password" id="pwd" class="form-input"
+                 placeholder="••••••••"
+                 autocomplete="current-password" required>
+          <button type="button" class="pwd-toggle" onclick="togglePwd('pwd',this)">Ver</button>
+        </div>
+        <span class="form-error" id="err-pwd">Ingresá tu contraseña.</span>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--full" id="btn-submit">
+        Iniciar sesión
+      </button>
+    </form>
+
+    <p style="font-size:.85rem;color:var(--soft);text-align:center">
+      ¿No tenés cuenta?
+      <a href="registro.html" style="font-weight:700">Registrate gratis</a>
+    </p>
+  </div>
+</div>
+</main>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+/* Redirigir si ya está logueado */
+if (Auth.get()) location.href = 'index.html';
+
+function togglePwd(id, btn) {
+  const i = document.getElementById(id);
+  i.type = i.type === 'password' ? 'text' : 'password';
+  btn.textContent = i.type === 'password' ? 'Ver' : 'Ocultar';
+}
+
+function mostrarAlert(msg, tipo = 'error') {
+  const el = document.getElementById('alert-box');
+  el.className = `alert alert-${tipo}`;
+  el.innerHTML = msg;
+  el.style.display = 'flex';
+}
+
+document.getElementById('login-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const pwd   = document.getElementById('pwd').value;
+  let ok = true;
+
+  // Validación básica
+  if (!email || !/\S+@\S+\.\S+/.test(email)) {
+    document.getElementById('err-email').classList.add('show');
+    document.getElementById('email').classList.add('error');
+    ok = false;
+  } else {
+    document.getElementById('err-email').classList.remove('show');
+    document.getElementById('email').classList.remove('error');
+  }
+  if (!pwd) {
+    document.getElementById('err-pwd').classList.add('show');
+    ok = false;
+  } else {
+    document.getElementById('err-pwd').classList.remove('show');
+  }
+  if (!ok) return;
+
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Ingresando…';
+
+  setTimeout(() => {
+    const result = Auth.login(email, pwd);
+    if (result.ok) {
+      mostrarAlert('✓ Sesión iniciada. Redirigiendo…', 'success');
+      setTimeout(() => {
+        const dest = sessionStorage.getItem('redirect_after_login') || 'index.html';
+        sessionStorage.removeItem('redirect_after_login');
+        location.href = dest;
+      }, 700);
+    } else {
+      mostrarAlert('✗ ' + result.error);
+      btn.disabled = false;
+      btn.textContent = 'Iniciar sesión';
+    }
+  }, 600);
+});
+</script>
+</body>
+</html>

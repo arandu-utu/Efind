@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrarse — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+<div class="auth-wrap">
+
+  <div class="auth-brand">
+    <a href="index.html" style="display:inline-block;margin-bottom:.5rem"><img src="img/efind-nav.png" alt="E-Find" class="brand-logo"></a>
+    <p class="auth-tagline">Creá tu cuenta y empezá a contribuir con la comunidad de VE en Uruguay.</p>
+    <ul class="auth-features">
+      <li>Registro gratuito en menos de 1 minuto</li>
+      <li>Agregá tus propios puntos de carga</li>
+      <li>Guardá cargadores favoritos</li>
+      <li>Accedé al estimador de carga personalizado</li>
+      <li>Si sos empresa: reportes financieros de tus terminales</li>
+    </ul>
+  </div>
+
+  <div class="auth-panel" style="overflow-y:auto;max-height:100vh">
+
+    <div class="tabs">
+      <button class="tab-btn" onclick="location.href='login.html'">Iniciar sesión</button>
+      <button class="tab-btn active">Registrarse</button>
+    </div>
+
+    <div id="alert-box" style="display:none"></div>
+
+    <form id="reg-form" style="display:flex;flex-direction:column;gap:.8rem" novalidate>
+
+      <!-- Tipo de cuenta -->
+      <div class="form-group">
+        <label class="form-label">Tipo de cuenta</label>
+        <div class="rol-grid">
+          <label class="rol-card selected" id="card-particular">
+            <input type="radio" name="rol" value="particular" checked>
+            <div class="rol-icon"><span data-icon="user" data-size="22"></span></div>
+            <div class="rol-name">Particular</div>
+            <div class="rol-detail">CI uruguaya</div>
+          </label>
+          <label class="rol-card" id="card-empresa">
+            <input type="radio" name="rol" value="empresa">
+            <div class="rol-icon">🏢</div>
+            <div class="rol-name">Empresa</div>
+            <div class="rol-detail">RUT + razón social</div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Nombre -->
+      <div class="form-group">
+        <label class="form-label" for="nombre">Nombre completo *</label>
+        <input type="text" id="nombre" class="form-input" placeholder="Juan Pérez" required autocomplete="name">
+        <span class="form-error" id="err-nombre">Mínimo 3 caracteres.</span>
+      </div>
+
+      <!-- Email -->
+      <div class="form-group">
+        <label class="form-label" for="email">Correo electrónico *</label>
+        <input type="email" id="email" class="form-input" placeholder="tucorreo@ejemplo.com" required autocomplete="email">
+        <span class="form-error" id="err-email">Email no válido o ya registrado.</span>
+      </div>
+
+      <!-- CI / RUT -->
+      <div class="form-group">
+        <label class="form-label" for="ci" id="lbl-ci">Cédula de Identidad *</label>
+        <input type="text" id="ci" class="form-input" placeholder="1.234.567-8" required>
+        <span class="form-hint" id="hint-ci">7 u 8 dígitos, con o sin puntos y guion</span>
+        <span class="form-error" id="err-ci">CI inválida.</span>
+      </div>
+
+      <!-- Nombre empresa (oculto por defecto) -->
+      <div class="form-group" id="campo-empresa" style="display:none">
+        <label class="form-label" for="empresa">Razón social *</label>
+        <input type="text" id="empresa" class="form-input" placeholder="Nombre de la empresa">
+        <span class="form-error" id="err-empresa">Ingresá el nombre de la empresa.</span>
+      </div>
+
+      <!-- Contraseña -->
+      <div class="form-group">
+        <label class="form-label" for="pwd">Contraseña *</label>
+        <div class="input-pwd">
+          <input type="password" id="pwd" class="form-input" placeholder="Mínimo 8 caracteres" required autocomplete="new-password">
+          <button type="button" class="pwd-toggle" onclick="togglePwd('pwd',this)">Ver</button>
+        </div>
+        <span class="form-error" id="err-pwd">Mínimo 8 caracteres.</span>
+      </div>
+
+      <!-- Confirmar -->
+      <div class="form-group">
+        <label class="form-label" for="pwd2">Confirmar contraseña *</label>
+        <div class="input-pwd">
+          <input type="password" id="pwd2" class="form-input" placeholder="Repetí la contraseña" required autocomplete="new-password">
+          <button type="button" class="pwd-toggle" onclick="togglePwd('pwd2',this)">Ver</button>
+        </div>
+        <span class="form-hint" id="hint-pwd2" style="color:var(--warn);display:none">Las contraseñas no coinciden.</span>
+        <span class="form-error" id="err-pwd2">Las contraseñas no coinciden.</span>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--full" id="btn-reg">
+        Crear cuenta
+      </button>
+    </form>
+
+    <p style="font-size:.82rem;color:var(--soft);text-align:center">
+      ¿Ya tenés cuenta? <a href="login.html" style="font-weight:700">Iniciá sesión</a>
+    </p>
+  </div>
+</div>
+</main>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+if (Auth.get()) location.href = 'index.html';
+
+/* Tipo de cuenta */
+let rolActual = 'particular';
+
+document.querySelectorAll('input[name="rol"]').forEach(r => {
+  r.addEventListener('change', function() {
+    rolActual = this.value;
+    document.querySelectorAll('.rol-card').forEach(c => c.classList.remove('selected'));
+    this.closest('.rol-card').classList.add('selected');
+    const esEmp = rolActual === 'empresa';
+    document.getElementById('campo-empresa').style.display = esEmp ? '' : 'none';
+    document.getElementById('lbl-ci').textContent = esEmp ? 'RUT de la empresa *' : 'Cédula de Identidad *';
+    document.getElementById('hint-ci').textContent = esEmp ? '12 dígitos sin puntos ni guiones' : '7 u 8 dígitos, con o sin puntos y guion';
+    document.getElementById('err-ci').textContent  = esEmp ? 'RUT inválido (12 dígitos).' : 'CI inválida.';
+  });
+});
+
+/* Toggle password */
+function togglePwd(id, btn) {
+  const i = document.getElementById(id);
+  i.type = i.type === 'password' ? 'text' : 'password';
+  btn.textContent = i.type === 'password' ? 'Ver' : 'Ocultar';
+}
+
+/* Validación en tiempo real de contraseñas */
+document.getElementById('pwd2').addEventListener('input', function() {
+  const match = this.value === document.getElementById('pwd').value;
+  document.getElementById('hint-pwd2').style.display = (!match && this.value) ? 'block' : 'none';
+});
+
+function mostrarAlert(msg, tipo='error') {
+  const el = document.getElementById('alert-box');
+  el.className = `alert alert-${tipo}`;
+  el.innerHTML = msg;
+  el.style.display = 'flex';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.getElementById('reg-form').addEventListener('submit', e => {
+  e.preventDefault();
+  let ok = true;
+
+  const nombre  = document.getElementById('nombre').value.trim();
+  const email   = document.getElementById('email').value.trim();
+  const ci      = document.getElementById('ci').value.trim();
+  const empresa = document.getElementById('empresa').value.trim();
+  const pwd     = document.getElementById('pwd').value;
+  const pwd2    = document.getElementById('pwd2').value;
+
+  /* Validar nombre */
+  const errNombre = document.getElementById('err-nombre');
+  if (nombre.length < 3) { errNombre.classList.add('show'); ok = false; }
+  else errNombre.classList.remove('show');
+
+  /* Validar email */
+  const errEmail = document.getElementById('err-email');
+  const emailOk = /\S+@\S+\.\S+/.test(email);
+  if (!emailOk) { errEmail.classList.add('show'); ok = false; }
+  else errEmail.classList.remove('show');
+
+  /* Validar CI/RUT */
+  const errCI = document.getElementById('err-ci');
+  const ciOk = rolActual === 'empresa' ? validarRUT(ci) : validarCI(ci);
+  if (!ciOk) { errCI.classList.add('show'); ok = false; }
+  else errCI.classList.remove('show');
+
+  /* Empresa */
+  const errEmp = document.getElementById('err-empresa');
+  if (rolActual === 'empresa' && !empresa) { errEmp.classList.add('show'); ok = false; }
+  else errEmp.classList.remove('show');
+
+  /* Contraseña */
+  const errPwd = document.getElementById('err-pwd');
+  if (pwd.length < 8) { errPwd.classList.add('show'); ok = false; }
+  else errPwd.classList.remove('show');
+
+  /* Confirmar */
+  const errPwd2 = document.getElementById('err-pwd2');
+  if (pwd !== pwd2) { errPwd2.classList.add('show'); ok = false; }
+  else errPwd2.classList.remove('show');
+
+  if (!ok) return;
+
+  const btn = document.getElementById('btn-reg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creando cuenta…';
+
+  setTimeout(() => {
+    const result = Auth.register({ nombre, email, ci_rut: ci, rol: rolActual, empresa });
+    if (result.ok) {
+      mostrarAlert('✓ ¡Cuenta creada! Redirigiendo…', 'success');
+      setTimeout(() => location.href = 'index.html', 900);
+    } else {
+      mostrarAlert('✗ ' + result.error);
+      btn.disabled = false;
+      btn.textContent = 'Crear cuenta';
+    }
+  }, 700);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agregar cargador — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+<div class="container-sm">
+  <h1 style="font-size:1.35rem;font-weight:900;color:var(--nav);margin-bottom:1.5rem">Agregar punto de carga</h1>
+
+  <!-- Stepper -->
+  <div class="stepper" id="stepper">
+    <div class="step active" id="step-0"><div class="step-circle">1</div><div class="step-label">Ubicación</div></div>
+    <div class="step"        id="step-1"><div class="step-circle">2</div><div class="step-label">Datos</div></div>
+    <div class="step"        id="step-2"><div class="step-circle">3</div><div class="step-label">Conectores</div></div>
+    <div class="step"        id="step-3"><div class="step-circle">4</div><div class="step-label">Confirmar</div></div>
+  </div>
+
+  <!-- ── PASO 1: Ubicación ─────────────────────────────────── -->
+  <div id="panel-0" class="card">
+    <div class="card__title"><span data-icon="pin" data-size="15"></span> Paso 1 — Ubicación</div>
+    <div class="form-group" style="margin-bottom:.75rem">
+      <label class="form-label" for="buscar-dir">Buscar dirección</label>
+      <div style="display:flex;gap:.5rem">
+        <input type="text" id="buscar-dir" class="form-input" placeholder="Av. 18 de Julio 1234, Montevideo">
+        <button class="btn btn--primary btn--sm" onclick="buscarDir()">Buscar</button>
+      </div>
+    </div>
+    <div id="mapa-nuevo" style="height:280px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);margin-bottom:.75rem"></div>
+    <p style="font-size:.8rem;color:var(--soft);margin-bottom:.75rem">💡 Hacé clic en el mapa para colocar el marcador con precisión.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+      <div class="form-group">
+        <label class="form-label">Latitud</label>
+        <input type="text" id="inp-lat" class="form-input" readonly placeholder="-34.9058">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Longitud</label>
+        <input type="text" id="inp-lng" class="form-input" readonly placeholder="-56.1882">
+      </div>
+    </div>
+    <input type="text" id="dir-final" class="form-input" placeholder="Dirección completa (editable)" style="margin-top:.75rem">
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn--primary" onclick="irPaso(1)" id="btn-p1">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ── PASO 2: Datos básicos ─────────────────────────────── -->
+  <div id="panel-1" class="card" style="display:none">
+    <div class="card__title"><span data-icon="clipboard" data-size="15"></span> Paso 2 — Datos del cargador</div>
+    <div style="display:flex;flex-direction:column;gap:.8rem">
+      <div class="form-group">
+        <label class="form-label" for="nombre-c">Nombre del punto de carga *</label>
+        <input type="text" id="nombre-c" class="form-input" placeholder="Ej: Mi cargador doméstico">
+        <span class="form-error" id="err-nombre">Campo obligatorio.</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div class="form-group">
+          <label class="form-label" for="horario-c">Horario</label>
+          <input type="text" id="horario-c" class="form-input" placeholder="24 horas">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="costo-c">Precio ($/kWh, 0 = gratis)</label>
+          <input type="number" id="costo-c" class="form-input" value="0" min="0" step="0.5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipo de acceso</label>
+        <div class="rol-grid">
+          <label class="rol-card selected" id="card-pub">
+            <input type="radio" name="acceso" value="publico" checked>
+            <div class="rol-icon"><span data-icon="globe" data-size="22"></span></div>
+            <div class="rol-name">Público</div>
+            <div class="rol-detail">Libre acceso</div>
+          </label>
+          <label class="rol-card" id="card-priv">
+            <input type="radio" name="acceso" value="privado">
+            <div class="rol-icon">🔒</div>
+            <div class="rol-name">Privado / Alquiler</div>
+            <div class="rol-detail">Reserva previa</div>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:1rem">
+      <button class="btn btn--ghost" onclick="irPaso(0)">← Volver</button>
+      <button class="btn btn--primary" onclick="irPaso(2)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ── PASO 3: Conectores ────────────────────────────────── -->
+  <div id="panel-2" class="card" style="display:none">
+    <div class="card__title"><span data-icon="bolt" data-size="15"></span> Paso 3 — Conectores</div>
+    <div id="conectores-lista"></div>
+    <button class="btn btn--outline btn--sm" style="margin-top:.75rem" onclick="agregarConector()">+ Agregar conector</button>
+    <div style="display:flex;justify-content:space-between;margin-top:1rem">
+      <button class="btn btn--ghost" onclick="irPaso(1)">← Volver</button>
+      <button class="btn btn--primary" onclick="irPaso(3)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ── PASO 4: Confirmar ─────────────────────────────────── -->
+  <div id="panel-3" class="card" style="display:none">
+    <div class="card__title">✅ Paso 4 — Confirmar</div>
+    <div id="resumen-final" style="font-size:.9rem;line-height:1.8"></div>
+    <div id="alert-agregar" style="display:none;margin-top:.75rem"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:1rem">
+      <button class="btn btn--ghost" onclick="irPaso(2)">← Volver</button>
+      <button class="btn btn--green btn--lg" onclick="guardar()">✔ Guardar cargador</button>
+    </div>
+  </div>
+
+  <!-- ── ÉXITO ──────────────────────────────────────────────── -->
+  <div id="panel-exito" class="card" style="display:none;text-align:center;padding:3rem 1.5rem">
+    <div style="font-size:3.5rem;margin-bottom:.75rem">✅</div>
+    <h2 style="color:var(--nav);margin-bottom:.5rem">¡Cargador agregado!</h2>
+    <p style="color:var(--soft);margin-bottom:1.5rem">Tu punto de carga ya está visible en el mapa.</p>
+    <a href="index.html" class="btn btn--primary">Ver en el mapa</a>
+  </div>
+</div>
+</main>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAuth();
+
+let pasoActual = 0;
+let marker = null;
+let latSel = null, lngSel = null;
+let conectores = [{ tipo:'Tipo 2', potencia:7.4 }];
+
+/* Inicializar mapa en paso 1 */
+const mapa = L.map('mapa-nuevo').setView([-34.9058, -56.1652], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { attribution:'&copy; OpenStreetMap' }).addTo(mapa);
+
+mapa.on('click', e => {
+  if (marker) mapa.removeLayer(marker);
+  marker = L.marker(e.latlng).addTo(mapa);
+  latSel = e.latlng.lat.toFixed(6);
+  lngSel = e.latlng.lng.toFixed(6);
+  document.getElementById('inp-lat').value = latSel;
+  document.getElementById('inp-lng').value = lngSel;
+  if (!document.getElementById('dir-final').value)
+    document.getElementById('dir-final').value = `${latSel}, ${lngSel}`;
+});
+
+function buscarDir() {
+  const q = encodeURIComponent(document.getElementById('buscar-dir').value);
+  fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) { alert('Dirección no encontrada, hacé clic en el mapa.'); return; }
+      const { lat, lon, display_name } = data[0];
+      mapa.setView([lat, lon], 16);
+      if (marker) mapa.removeLayer(marker);
+      marker = L.marker([lat, lon]).addTo(mapa);
+      latSel = (+lat).toFixed(6);
+      lngSel = (+lon).toFixed(6);
+      document.getElementById('inp-lat').value = latSel;
+      document.getElementById('inp-lng').value = lngSel;
+      document.getElementById('dir-final').value = display_name.split(',').slice(0,3).join(',');
+    }).catch(() => alert('No se pudo buscar la dirección. Hacé clic en el mapa.'));
+}
+
+/* Tipo de acceso */
+document.querySelectorAll('input[name="acceso"]').forEach(r => {
+  r.addEventListener('change', function() {
+    document.querySelectorAll('#card-pub,#card-priv').forEach(c=>c.classList.remove('selected'));
+    this.closest('.rol-card').classList.add('selected');
+  });
+});
+
+/* Conectores */
+function renderConectores() {
+  const lista = document.getElementById('conectores-lista');
+  lista.innerHTML = conectores.map((c,i) => `
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+      <select class="form-select" style="flex:1;font-size:.85rem" onchange="conectores[${i}].tipo=this.value">
+        ${['Tipo 2','CCS2','CHAdeMO','Schuko'].map(t=>
+          `<option ${t===c.tipo?'selected':''}>${t}</option>`).join('')}
+      </select>
+      <input type="number" class="form-input" value="${c.potencia}"
+             style="width:90px;font-size:.85rem" min="1" max="350" step="0.1"
+             onchange="conectores[${i}].potencia=+this.value" title="Potencia (kW)">
+      <span style="font-size:.8rem;color:var(--soft);white-space:nowrap">kW</span>
+      ${conectores.length>1 ? `<button class="btn btn--ghost btn--sm" onclick="quitarConector(${i})">${ICONS.x(14)}</button>` : ''}
+    </div>`).join('');
+}
+function agregarConector() { conectores.push({tipo:'Tipo 2',potencia:7.4}); renderConectores(); }
+function quitarConector(i) { conectores.splice(i,1); renderConectores(); }
+
+/* Stepper */
+function irPaso(n) {
+  /* Validaciones */
+  if (n > 0 && pasoActual === 0 && (!latSel || !lngSel)) {
+    alert('Hacé clic en el mapa para seleccionar la ubicación.'); return;
+  }
+  if (n > 1 && pasoActual === 1) {
+    const nom = document.getElementById('nombre-c').value.trim();
+    if (!nom) { document.getElementById('err-nombre').classList.add('show'); return; }
+    document.getElementById('err-nombre').classList.remove('show');
+  }
+
+  /* Ocultar actual */
+  document.getElementById(`panel-${pasoActual}`).style.display = 'none';
+
+  /* Actualizar stepper */
+  document.getElementById(`step-${pasoActual}`).classList.remove('active');
+  if (n > pasoActual) document.getElementById(`step-${pasoActual}`).classList.add('done');
+
+  pasoActual = n;
+
+  /* Mostrar nuevo */
+  document.getElementById(`panel-${n}`).style.display = '';
+  document.getElementById(`step-${n}`).classList.add('active');
+
+  if (n === 2) renderConectores();
+  if (n === 3) renderResumen();
+
+  setTimeout(() => mapa.invalidateSize(), 100);
+}
+
+function renderResumen() {
+  const nombre  = document.getElementById('nombre-c').value;
+  const dir     = document.getElementById('dir-final').value;
+  const horario = document.getElementById('horario-c').value || 'No especificado';
+  const costo   = document.getElementById('costo-c').value;
+  const acceso  = document.querySelector('input[name="acceso"]:checked').value;
+  document.getElementById('resumen-final').innerHTML = `
+    <table style="width:100%;border-collapse:collapse">
+      ${[
+        ['Nombre', nombre],
+        ['Dirección', dir],
+        ['Coordenadas', `${latSel}, ${lngSel}`],
+        ['Horario', horario],
+        ['Precio', costo > 0 ? `$${costo}/kWh` : 'Gratuito'],
+        ['Acceso', acceso],
+        ['Conectores', conectores.map(c=>`${c.tipo} ${c.potencia}kW`).join(' · ')],
+      ].map(([k,v]) => `
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:.5rem .25rem;color:var(--soft);width:40%">${k}</td>
+          <td style="padding:.5rem .25rem;font-weight:700">${v}</td>
+        </tr>`).join('')}
+    </table>`;
+}
+
+function guardar() {
+  const btn = document.querySelector('[onclick="guardar()"]');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Guardando…';
+
+  setTimeout(() => {
+    const u = Auth.get();
+    const lista = getMock('cargadores');
+    const nuevo = {
+      id: Date.now(),
+      nombre:  document.getElementById('nombre-c').value,
+      lat:     +latSel, lng: +lngSel,
+      direccion: document.getElementById('dir-final').value,
+      estado:  'disponible',
+      horario: document.getElementById('horario-c').value || '24 horas',
+      costo_kwh: +document.getElementById('costo-c').value || 0,
+      publica: document.querySelector('input[name="acceso"]:checked').value === 'publico',
+      conectores: conectores.map(c=>({...c})),
+      resenas: [], cola: 0,
+      propietario_id: u.id,
+    };
+    lista.push(nuevo);
+    setMock('cargadores', lista);
+
+    document.getElementById('panel-3').style.display = 'none';
+    document.getElementById('panel-exito').style.display = '';
+  }, 900);
+}
+</script>
+</body>
+</html>

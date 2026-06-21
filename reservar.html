@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reservar carga — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .pago-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+    .monto-row { display:flex; justify-content:space-between; align-items:center;
+                 padding:.45rem 0; font-size:.9rem; border-bottom:1px solid var(--border); }
+    .monto-row:last-child { border-bottom:none; }
+    .monto-row.total { font-weight:900; font-size:1.1rem; color:var(--nav); }
+  </style>
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content">
+<div class="container-sm" style="max-width:620px">
+
+  <div style="font-size:.8rem;color:var(--soft);margin-bottom:1rem">
+    <a href="index.html">Mapa</a> › <span id="bread-nombre">Cargador</span> › Reservar
+  </div>
+
+  <!-- PASO 1: Selección -->
+  <div id="panel-reserva" class="card">
+    <div class="card__title"><span data-icon="bolt" data-size="16"></span> Reservar carga</div>
+
+    <div id="resumen-cargador" style="padding:.75rem;background:var(--bg);border-radius:var(--radius);margin-bottom:1.1rem;font-size:.88rem"></div>
+
+    <!-- Vehículo -->
+    <div class="form-group" style="margin-bottom:.85rem">
+      <label class="form-label">Mi vehículo</label>
+      <select id="sel-vehiculo" class="form-select" onchange="recalcular()">
+        <option value="">— Seleccioná un vehículo —</option>
+      </select>
+    </div>
+
+    <!-- Conector -->
+    <div class="form-group" style="margin-bottom:.85rem">
+      <label class="form-label">Tipo de conector</label>
+      <select id="sel-conector" class="form-select" onchange="recalcular()"></select>
+    </div>
+
+    <!-- SOC -->
+    <div class="form-group" style="margin-bottom:.85rem">
+      <label class="form-label">Estado de carga actual: <strong id="soc-val">20%</strong></label>
+      <input type="range" id="soc" min="0" max="99" value="20"
+             style="width:100%;accent-color:var(--accent)"
+             oninput="document.getElementById('soc-val').textContent=this.value+'%';recalcular()">
+    </div>
+
+    <!-- Resumen cálculo -->
+    <div class="card" style="background:var(--bg);box-shadow:none;margin-bottom:1.1rem" id="calculo-box">
+      <div class="monto-row"><span>Energía a cargar</span><strong id="c-kwh">—</strong></div>
+      <div class="monto-row"><span>Tiempo estimado</span><strong id="c-tiempo">—</strong></div>
+      <div class="monto-row"><span>Precio por kWh</span><strong id="c-precio">—</strong></div>
+      <div class="monto-row"><span>Subtotal</span><strong id="c-subtotal">—</strong></div>
+      <div class="monto-row"><span style="color:var(--soft);font-size:.82rem">Comisión plataforma (10%)</span><span id="c-comision" style="color:var(--soft);font-size:.82rem">—</span></div>
+      <div class="monto-row total"><span>Total a pagar</span><span id="c-total">—</span></div>
+    </div>
+
+    <button class="btn btn--green btn--full btn--lg" onclick="irPago()">
+      Continuar al pago →
+    </button>
+  </div>
+
+  <!-- PASO 2: Pago ficticio -->
+  <div id="panel-pago" class="card" style="display:none">
+    <div class="card__title">💳 Datos de pago (simulado)</div>
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      Este proceso es una simulación. No se realizará ningún cobro real.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:.8rem">
+      <div class="form-group">
+        <label class="form-label">Número de tarjeta</label>
+        <input type="text" id="num-tarjeta" class="form-input" placeholder="1234 5678 9012 3456"
+               maxlength="19" oninput="formatCard(this)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nombre en la tarjeta</label>
+        <input type="text" id="nombre-tarjeta" class="form-input" placeholder="JUAN PEREZ">
+      </div>
+      <div class="pago-grid">
+        <div class="form-group">
+          <label class="form-label">Vencimiento</label>
+          <input type="text" id="venc" class="form-input" placeholder="MM/AA" maxlength="5" oninput="formatVenc(this)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">CVV</label>
+          <input type="text" id="cvv" class="form-input" placeholder="123" maxlength="3">
+        </div>
+      </div>
+    </div>
+    <div id="pago-alert" style="display:none;margin-top:.75rem"></div>
+    <div style="display:flex;gap:.6rem;margin-top:1.1rem">
+      <button class="btn btn--ghost" onclick="volverReserva()">← Volver</button>
+      <button class="btn btn--primary btn--full" onclick="procesarPago()" id="btn-pagar">
+        Confirmar y pagar
+      </button>
+    </div>
+  </div>
+
+  <!-- COMPROBANTE -->
+  <div id="panel-recibo" class="card" style="display:none;text-align:center">
+    <div style="margin-bottom:1.25rem" id="reserved-check-icon"></div>
+    <script>document.getElementById("reserved-check-icon").innerHTML = ICONS.reservedCheck(64);</script>
+    <h2 style="color:var(--nav);margin-bottom:.4rem">¡Carga reservada!</h2>
+    <p style="color:var(--soft);margin-bottom:1.25rem">Recibo de transacción</p>
+    <div style="background:var(--bg);border-radius:var(--radius);padding:1rem;text-align:left;margin-bottom:1.25rem;font-size:.88rem">
+      <div class="monto-row"><span>N° de recibo</span><strong id="r-nro">—</strong></div>
+      <div class="monto-row"><span>Cargador</span><strong id="r-nombre">—</strong></div>
+      <div class="monto-row"><span>Energía cargada</span><strong id="r-kwh">—</strong></div>
+      <div class="monto-row"><span>Tiempo estimado</span><strong id="r-tiempo">—</strong></div>
+      <div class="monto-row total"><span>Total pagado</span><strong id="r-total">—</strong></div>
+      <div class="monto-row"><span style="color:var(--soft)">Acreditado al propietario (90%)</span><span id="r-prop" style="color:var(--green);font-weight:700">—</span></div>
+    </div>
+    <a href="index.html" class="btn btn--primary">Volver al mapa</a>
+    <a href="perfil.html" class="btn btn--ghost" style="margin-top:.4rem">Ver mis transacciones</a>
+
+    <!-- Calificación post-pago -->
+    <div id="rating-section" style="margin-top:1.5rem;text-align:left">
+      <div class="rate-form">
+        <h4>¿Cómo fue tu experiencia con el propietario?</h4>
+        <div class="star-picker" id="star-picker">
+          <!-- Soles de Mayo — se populan dinámicamente en initSolPicker() -->
+        </div>
+        <textarea id="rating-comentario" class="form-textarea" rows="2"
+          placeholder="Comentario opcional…" style="margin-bottom:.75rem"></textarea>
+        <button class="btn btn--green btn--sm" onclick="enviarCalificacion()">Enviar calificación</button>
+        <button class="btn btn--ghost btn--sm" onclick="document.getElementById('rating-section').style.display='none'" style="margin-left:.5rem">Omitir</button>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  /* ── Calificación post-pago ─────────────────────────────────── */
+  let _puntos = 0;
+
+  /* Inserta soles SVG en el picker (requiere solSVG de mock-data.js) */
+  function initSolPicker() {
+    const picker = document.getElementById('star-picker');
+    if (!picker) return;
+    picker.innerHTML = [1,2,3,4,5].map(v =>
+      `<span class="sp-star" data-val="${v}" onclick="pickStar(${v})"
+             onmouseenter="hoverStar(${v})" onmouseleave="unhoverStar()"
+             style="color:#C8D3DF">${solSVG(30)}</span>`
+    ).join('');
+  }
+
+  function pickStar(val) {
+    _puntos = val;
+    document.querySelectorAll('.sp-star').forEach(s => {
+      const v = +s.dataset.val;
+      s.style.color = v <= val ? '#F5B800' : '#C8D3DF';
+      s.style.transform = v <= val ? 'scale(1.08)' : 'scale(1)';
+    });
+  }
+
+  function hoverStar(val) {
+    document.querySelectorAll('.sp-star').forEach(s => {
+      s.style.color = +s.dataset.val <= val ? '#FFCC30' : '#C8D3DF';
+    });
+  }
+  function unhoverStar() {
+    document.querySelectorAll('.sp-star').forEach(s => {
+      const v = +s.dataset.val;
+      s.style.color = v <= _puntos ? '#F5B800' : '#C8D3DF';
+    });
+  }
+
+  function enviarCalificacion() {
+    if (_puntos === 0) { alert('Seleccioná una puntuación antes de enviar.'); return; }
+    const tx = getMock('transacciones').find(t => t.id === window._txId);
+    if (!tx) return;
+    const propietario_id = tx.propietario_id;
+    const cals = getMock('calificaciones');
+    cals.push({
+      id: Date.now(),
+      de_usuario_id: U.id,
+      para_usuario_id: propietario_id,
+      transaccion_id: tx.id,
+      puntos: _puntos,
+      comentario: document.getElementById('rating-comentario').value.trim(),
+      fecha: new Date().toISOString().slice(0, 10),
+      tipo: 'cliente_a_propietario',
+    });
+    setMock('calificaciones', cals);
+    recalcularCalificacion(propietario_id);
+    const trans = getMock('transacciones');
+    const idx = trans.findIndex(t => t.id === window._txId);
+    if (idx !== -1) { trans[idx].calificado = true; setMock('transacciones', trans); }
+    document.getElementById('rating-section').innerHTML =
+      '<p style="color:var(--green);font-weight:600;text-align:center;padding:.75rem">✓ ¡Gracias por tu calificación!</p>';
+  }
+</script>
+<script src="js/estimador.js"></script>
+<script>
+requireAuth();
+const U = Auth.get();
+const ID = +cargadorIdFromURL();
+const C  = getCargador(ID);
+
+let calcActual = null;
+
+if (!C) { location.href = 'index.html'; }
+else init();
+
+function init() {
+  document.getElementById('bread-nombre').textContent = C.nombre;
+
+  /* Resumen cargador */
+  document.getElementById('resumen-cargador').innerHTML = `
+    <strong>${C.nombre}</strong> &nbsp;·&nbsp; ${C.direccion}<br>
+    <span style="color:var(--soft)">${C.horario} &nbsp;·&nbsp; ${C.costo_kwh ? '$'+C.costo_kwh+'/kWh' : 'Gratuito'}</span>`;
+
+  /* Vehículos del usuario */
+  const sel = document.getElementById('sel-vehiculo');
+  const vehs = getMock('vehiculos').filter(v => v.usuario_id === U.id);
+  vehs.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v.capacidad_kwh;
+    o.dataset.cap = v.capacidad_kwh;
+    o.textContent = `${v.marca} ${v.modelo} (${v.capacidad_kwh} kWh)`;
+    sel.appendChild(o);
+  });
+
+  /* Conectores */
+  const selC = document.getElementById('sel-conector');
+  C.conectores.forEach((c,i) => {
+    const o = document.createElement('option');
+    o.value = i;
+    o.textContent = `${c.tipo} — ${c.potencia} kW`;
+    selC.appendChild(o);
+  });
+
+  recalcular();
+}
+
+function recalcular() {
+  const selV = document.getElementById('sel-vehiculo');
+  const cap  = selV.value ? +selV.value : 60;
+  const soc  = +document.getElementById('soc').value;
+  const pot  = C.conectores[+document.getElementById('sel-conector').value]?.potencia || 7.4;
+  const r    = calcularCarga(cap, soc, pot);
+  const kwh  = r.kwh;
+  const costo = C.costo_kwh || 0;
+  const subtotal = kwh * costo;
+  const comision = subtotal * 0.10;
+  const total    = subtotal;
+
+  calcActual = { kwh, tiempo: r.texto, subtotal, comision, total };
+
+  document.getElementById('c-kwh').textContent     = kwh + ' kWh';
+  document.getElementById('c-tiempo').textContent  = r.texto;
+  document.getElementById('c-precio').textContent  = costo ? `$${costo}/kWh` : 'Gratuito';
+  document.getElementById('c-subtotal').textContent = costo ? `$${subtotal.toFixed(0)} UYU` : 'Gratuito';
+  document.getElementById('c-comision').textContent = costo ? `$${comision.toFixed(0)} UYU` : '—';
+  document.getElementById('c-total').textContent   = costo ? `$${total.toFixed(0)} UYU` : 'Gratuito';
+}
+
+function irPago() {
+  document.getElementById('panel-reserva').style.display = 'none';
+  document.getElementById('panel-pago').style.display    = '';
+  if (!C.costo_kwh) {
+    /* Gratuito: saltar pago directamente */
+    confirmarGratis();
+  }
+}
+
+function confirmarGratis() {
+  emitirRecibo('gratuita', '0');
+}
+
+function volverReserva() {
+  document.getElementById('panel-pago').style.display    = 'none';
+  document.getElementById('panel-reserva').style.display = '';
+}
+
+function formatCard(el) {
+  el.value = el.value.replace(/\D/g,'').replace(/(.{4})/g,'$1 ').trim();
+}
+function formatVenc(el) {
+  el.value = el.value.replace(/\D/g,'').replace(/(\d{2})(\d)/,'$1/$2').slice(0,5);
+}
+
+function procesarPago() {
+  const num  = document.getElementById('num-tarjeta').value.replace(/\s/g,'');
+  const nom  = document.getElementById('nombre-tarjeta').value.trim();
+  const venc = document.getElementById('venc').value;
+  const cvv  = document.getElementById('cvv').value;
+
+  if (num.length < 16 || !nom || venc.length < 5 || cvv.length < 3) {
+    const al = document.getElementById('pago-alert');
+    al.className = 'alert alert-error';
+    al.innerHTML = 'Completá todos los datos de la tarjeta.';
+    al.style.display = 'flex';
+    return;
+  }
+
+  const btn = document.getElementById('btn-pagar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Procesando…';
+
+  setTimeout(() => emitirRecibo(nom, calcActual?.total ?? 0), 1500);
+}
+
+function emitirRecibo(titular, total) {
+  const nro = 'EF-' + Date.now();
+  const trans = getMock('transacciones');
+  const nuevaTx = {
+    id: Date.now(), usuario_id: U.id, cargador_id: C.id,
+    propietario_id: C.propietario_id,
+    duracion_h: +(calcActual?.tiempo.replace(/[^\d.]/g,'')),
+    kwh: calcActual?.kwh, monto_total: +total,
+    comision: calcActual?.comision, fecha: new Date().toISOString().slice(0,10),
+    recibo: nro, calificado: false,
+  };
+  trans.push(nuevaTx);
+  setMock('transacciones', trans);
+  window._txId = nuevaTx.id;
+
+  document.getElementById('panel-pago').style.display    = 'none';
+  document.getElementById('panel-recibo').style.display  = '';
+  initSolPicker();
+
+  document.getElementById('r-nro').textContent    = nro;
+  document.getElementById('r-nombre').textContent = C.nombre;
+  document.getElementById('r-kwh').textContent    = calcActual?.kwh + ' kWh';
+  document.getElementById('r-tiempo').textContent = calcActual?.tiempo;
+  document.getElementById('r-total').textContent  = total > 0 ? `$${(+total).toFixed(0)} UYU` : 'Gratuito';
+  document.getElementById('r-prop').textContent   = total > 0 ? `$${(+total * 0.9).toFixed(0)} UYU` : '—';
+}
+</script>
+</body>
+</html>

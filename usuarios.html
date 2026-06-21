@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de usuarios — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+<main class="main-content">
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="sidebar-section">Principal</div>
+    <a href="admin.html"    class="sidebar-link"><span class="ico" data-icon="chart" data-size="18"></span><span>Dashboard</span></a>
+    <a href="admin.html#cargadores" class="sidebar-link"><span class="ico" data-icon="bolt" data-size="18"></span><span>Cargadores</span></a>
+    <a href="usuarios.html" class="sidebar-link active"><span class="ico" data-icon="users" data-size="18"></span><span>Usuarios</span></a>
+    <div class="sidebar-section">Moderación</div>
+    <a href="admin.html#resenas"  class="sidebar-link"><span class="ico">⭐</span><span>Reseñas</span></a>
+    <a href="admin.html#reportes" class="sidebar-link"><span class="ico" data-icon="warning" data-size="18"></span><span>Reportes</span></a>
+    <div class="sidebar-section">Sistema</div>
+    <a href="index.html" class="sidebar-link"><span class="ico" data-icon="globe" data-size="18"></span><span>Ver mapa</span></a>
+  </aside>
+
+  <div class="admin-content">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
+      <h1 class="admin-title" style="margin-bottom:0">Gestión de usuarios</h1>
+      <div style="display:flex;gap:.5rem;align-items:center">
+        <select id="f-rol" class="form-select" style="font-size:.85rem;width:auto" onchange="renderTabla()">
+          <option value="">Todos los roles</option>
+          <option value="particular">Particular</option>
+          <option value="empresa">Empresa</option>
+          <option value="moderador">Moderador</option>
+          <option value="admin">Admin</option>
+        </select>
+        <input type="text" id="f-buscar" class="form-input" style="font-size:.85rem;width:200px"
+               placeholder="Buscar nombre o email…" oninput="renderTabla()">
+      </div>
+    </div>
+
+    <div id="alert-accion" style="display:none;margin-bottom:1rem"></div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Email</th>
+              <th>Rol</th>
+              <th>CI / RUT</th>
+              <th>Calificación</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-usuarios"></tbody>
+        </table>
+      </div>
+      <div id="sin-resultados" style="display:none;text-align:center;padding:2rem;color:var(--soft);font-size:.88rem">
+        Sin usuarios para este filtro.
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+<script>
+requireAdmin();
+const ME = Auth.get();
+
+const rolesLabel = {particular:'Particular',empresa:'Empresa',moderador:'Moderador',admin:'Admin'};
+const rolesBadge = {particular:'badge-blue',empresa:'badge-green',moderador:'badge-orange',admin:'badge-red'};
+
+function renderTabla() {
+  const filtroRol  = document.getElementById('f-rol').value;
+  const filtroBusc = document.getElementById('f-buscar').value.toLowerCase();
+
+  let lista = getMock('usuarios').filter(u => {
+    if (filtroRol && u.rol !== filtroRol) return false;
+    if (filtroBusc && !u.nombre.toLowerCase().includes(filtroBusc) &&
+                      !u.email.toLowerCase().includes(filtroBusc)) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('tbody-usuarios');
+  const sinRes = document.getElementById('sin-resultados');
+
+  if (!lista.length) {
+    tbody.innerHTML = '';
+    sinRes.style.display = '';
+    return;
+  }
+  sinRes.style.display = 'none';
+
+  tbody.innerHTML = lista.map(u => {
+    const esMismo = u.id === ME.id;
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:.82rem;font-weight:900;color:#fff;flex-shrink:0">${u.avatar}</div>
+          <div>
+            <div style="font-weight:700;font-size:.88rem">${u.nombre}</div>
+            ${u.empresa ? `<div style="font-size:.75rem;color:var(--soft)">${u.empresa}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td style="font-size:.85rem">${u.email}</td>
+      <td>
+        <span class="badge ${rolesBadge[u.rol]||'badge-blue'}">${rolesLabel[u.rol]||u.rol}</span>
+      </td>
+      <td style="font-family:monospace;font-size:.82rem">${u.ci_rut}</td>
+      <td>${renderStars(u.calificacion_promedio, u.num_calificaciones)}</td>
+      <td>
+        <span class="badge ${u.activo ? 'badge-green' : 'badge-gray'}">${u.activo ? 'Activo' : 'Suspendido'}</span>
+      </td>
+      <td>
+        ${esMismo ? '<span style="font-size:.78rem;color:var(--soft)">Tu cuenta</span>' : `
+          <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+            <select class="form-select" style="font-size:.78rem;padding:.25rem .4rem;width:auto"
+                    onchange="cambiarRol(${u.id},this.value)">
+              ${Object.entries(rolesLabel).map(([k,v])=>
+                `<option value="${k}" ${u.rol===k?'selected':''}>${v}</option>`).join('')}
+            </select>
+            <button class="btn btn--sm btn--${u.activo?'warn':'green'}"
+                    onclick="toggleActivo(${u.id})">
+              ${u.activo ? 'Suspender' : 'Activar'}
+            </button>
+          </div>
+        `}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function cambiarRol(id, nuevoRol) {
+  const lista = getMock('usuarios');
+  const idx = lista.findIndex(u => u.id === id);
+  lista[idx].rol = nuevoRol;
+  setMock('usuarios', lista);
+  mostrarAlerta(`✓ Rol actualizado a "${rolesLabel[nuevoRol]}".`, 'success');
+  renderTabla();
+}
+
+function toggleActivo(id) {
+  const lista = getMock('usuarios');
+  const idx = lista.findIndex(u => u.id === id);
+  lista[idx].activo = !lista[idx].activo;
+  setMock('usuarios', lista);
+  const estado = lista[idx].activo ? 'activado' : 'suspendido';
+  mostrarAlerta(`✓ Usuario ${estado}.`, lista[idx].activo ? 'success' : 'warn');
+  renderTabla();
+}
+
+function mostrarAlerta(msg, tipo) {
+  const el = document.getElementById('alert-accion');
+  el.className = `alert alert-${tipo}`;
+  el.innerHTML = msg;
+  el.style.display = 'flex';
+  setTimeout(() => el.style.display='none', 3000);
+}
+
+renderTabla();
+</script>
+</body>
+</html>
