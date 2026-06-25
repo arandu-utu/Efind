@@ -3,26 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
   <title>Gestión de usuarios — E-Find</title>
   <link rel="stylesheet" href="css/style.css">
+  <meta name="description" content="Administrá roles y estados de los usuarios registrados en E-Find.">
+  <meta property="og:title"       content="Gestión de usuarios — E-Find">
+  <meta property="og:description" content="Administrá roles y estados de los usuarios registrados en E-Find.">
+  <meta property="og:image"       content="https://efind.uy/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
 </head>
 <body>
 <nav class="navbar" id="navbar"></nav>
-<main class="main-content">
+<main class="main-content page-enter">
 <div class="admin-layout">
-  <aside class="admin-sidebar">
+  <aside class="admin-sidebar anim-fade-in anim-d1">
     <div class="sidebar-section">Principal</div>
     <a href="admin.html"    class="sidebar-link"><span class="ico" data-icon="chart" data-size="18"></span><span>Dashboard</span></a>
     <a href="admin.html#cargadores" class="sidebar-link"><span class="ico" data-icon="bolt" data-size="18"></span><span>Cargadores</span></a>
     <a href="usuarios.html" class="sidebar-link active"><span class="ico" data-icon="users" data-size="18"></span><span>Usuarios</span></a>
     <div class="sidebar-section">Moderación</div>
-    <a href="admin.html#resenas"  class="sidebar-link"><span class="ico">⭐</span><span>Reseñas</span></a>
+    <a href="admin.html#resenas"  class="sidebar-link"><span class="ico" data-icon="sun" data-size="18"></span><span>Reseñas</span></a>
     <a href="admin.html#reportes" class="sidebar-link"><span class="ico" data-icon="warning" data-size="18"></span><span>Reportes</span></a>
     <div class="sidebar-section">Sistema</div>
     <a href="index.html" class="sidebar-link"><span class="ico" data-icon="globe" data-size="18"></span><span>Ver mapa</span></a>
   </aside>
 
-  <div class="admin-content">
+  <div class="admin-content anim-fade-up anim-d2">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
       <h1 class="admin-title" style="margin-bottom:0">Gestión de usuarios</h1>
       <div style="display:flex;gap:.5rem;align-items:center">
@@ -57,8 +67,12 @@
           <tbody id="tbody-usuarios"></tbody>
         </table>
       </div>
-      <div id="sin-resultados" style="display:none;text-align:center;padding:2rem;color:var(--soft);font-size:.88rem">
-        Sin usuarios para este filtro.
+      <div id="sin-resultados" style="display:none">
+        <div class="empty-state">
+          <div class="empty-state__icon">${ICONS ? ICONS.users(40) : ''}</div>
+          <div class="empty-state__title">Sin usuarios</div>
+          <div class="empty-state__body">No hay usuarios que coincidan con el filtro aplicado.</div>
+        </div>
       </div>
     </div>
   </div>

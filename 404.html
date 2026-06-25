@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
+  <meta name="description"     content="Página no encontrada — E-Find">
+  <title>404 — Página no encontrada · E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content page-enter" style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 120px)">
+  <div style="text-align:center;padding:3rem 1.5rem;max-width:480px">
+
+    <!-- Ícono E-Find con número 404 superpuesto -->
+    <div style="position:relative;display:inline-block;margin-bottom:1.5rem">
+      <svg width="96" height="96" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+           style="color:var(--border)">
+        <!-- Pin vacío -->
+        <path fill-rule="evenodd" clip-rule="evenodd"
+          d="M12 2C8.134 2 5 5.134 5 9.1c0 5.6 7 12.9 7 12.9s7-7.3 7-12.9C19 5.134 15.866 2 12 2z"
+          fill="currentColor"/>
+        <path d="M13.1 5.5L10 10h2.3L11.2 14 15 9h-2.4z" fill="white"/>
+      </svg>
+      <span style="
+        position:absolute;
+        top:-8px;right:-18px;
+        background:var(--warn);
+        color:#fff;
+        font-size:.7rem;font-weight:900;
+        border-radius:99px;
+        padding:2px 7px;
+        letter-spacing:.04em;
+      ">404</span>
+    </div>
+
+    <h1 style="font-size:1.6rem;font-weight:900;color:var(--nav);margin-bottom:.5rem">
+      Cargador no encontrado
+    </h1>
+    <p style="font-size:.95rem;color:var(--soft);line-height:1.6;margin-bottom:2rem">
+      La página que buscas no existe o fue movida.<br>
+      Pero seguro hay un cargador cerca de vos.
+    </p>
+
+    <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap">
+      <a href="index.html" class="btn btn--primary">
+        <span data-icon="globe" data-size="15"></span> Ir al mapa
+      </a>
+      <button class="btn btn--outline" onclick="history.back()">
+        ← Volver
+      </button>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/mock-data.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

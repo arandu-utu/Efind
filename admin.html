@@ -3,16 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
   <title>Panel Admin — E-Find</title>
   <link rel="stylesheet" href="css/style.css">
+  <meta name="description" content="Gestión centralizada de cargadores, usuarios, reseñas y reportes de la plataforma E-Find.">
+  <meta property="og:title"       content="Panel de administración — E-Find">
+  <meta property="og:description" content="Gestión centralizada de cargadores, usuarios, reseñas y reportes de la plataforma E-Find.">
+  <meta property="og:image"       content="https://efind.uy/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
 </head>
 <body>
 <nav class="navbar" id="navbar"></nav>
-<main class="main-content">
+<main class="main-content page-enter">
 <div class="admin-layout">
 
   <!-- Sidebar -->
-  <aside class="admin-sidebar">
+  <aside class="admin-sidebar anim-fade-in anim-d1">
     <div class="sidebar-section">Principal</div>
     <a href="admin.html"    class="sidebar-link active"><span class="ico" data-icon="chart" data-size="18"></span><span>Dashboard</span></a>
     <a href="admin.html#cargadores" class="sidebar-link"><span class="ico" data-icon="bolt" data-size="18"></span><span>Cargadores</span></a>
@@ -25,7 +35,7 @@
   </aside>
 
   <!-- Contenido -->
-  <div class="admin-content">
+  <div class="admin-content anim-fade-up anim-d2">
     <h1 class="admin-title">Dashboard</h1>
 
     <!-- KPIs -->

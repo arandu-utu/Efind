@@ -3,27 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
   <title>E-Find — Mapa de Cargadores</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <meta name="description" content="Encuentra puntos de carga para vehículos eléctricos en Uruguay. Mapa en tiempo real, filtros y reservas.">
+  <meta property="og:title"       content="E-Find — Mapa de Cargadores">
+  <meta property="og:description" content="Encuentra puntos de carga para vehículos eléctricos en Uruguay. Mapa en tiempo real, filtros y reservas.">
+  <meta property="og:image"       content="https://efind.uy/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
 </head>
 <body>
 
 <nav class="navbar" id="navbar"></nav>
 
-<main class="main-content">
+<main class="main-content page-enter">
   <div class="map-layout">
 
     <!-- ── Sidebar ───────────────────────────────────────────── -->
     <aside class="map-sidebar">
       <div class="map-sidebar__head">
-        <input
-          type="text"
-          id="buscador"
-          class="form-input"
-          placeholder="🔍  Buscar cargador o dirección…"
-          style="font-size:.85rem"
-        >
+        <div style="position:relative">
+          <span data-icon="search" data-size="14"
+                style="position:absolute;left:.6rem;top:50%;transform:translateY(-50%);
+                       color:var(--soft);pointer-events:none;display:flex"></span>
+          <input
+            type="text"
+            id="buscador"
+            class="form-input"
+            placeholder="Buscar cargador o dirección…"
+            style="font-size:.85rem;padding-left:2.1rem"
+          >
+        </div>
       </div>
 
       <div class="map-sidebar__body">
@@ -143,7 +158,11 @@ function renderMarcadores(lista) {
 function renderLista(lista) {
   const el = document.getElementById('charger-list');
   if (!lista.length) {
-    el.innerHTML = '<p style="font-size:.82rem;color:var(--soft);text-align:center;padding:1rem">Sin resultados para estos filtros.</p>';
+    el.innerHTML = `<div class="empty-state" style="padding:2rem 1rem">
+      <div class="empty-state__icon">${ICONS.bolt(40)}</div>
+      <div class="empty-state__title">Sin cargadores</div>
+      <div class="empty-state__body">Probá ajustando los filtros o buscá en otra zona del mapa.</div>
+    </div>`;
     return;
   }
   el.innerHTML = lista.map(c => {
@@ -196,7 +215,7 @@ function abrirPopup(c) {
   const potMax   = Math.max(...c.conectores.map(x => x.potencia));
   const conTypes = [...new Set(c.conectores.map(x => x.tipo))].join(' · ');
   const precio   = c.costo_kwh ? `$${c.costo_kwh}/kWh` : 'Gratuito';
-  const colaInfo = c.cola > 0 ? `<span style="color:var(--warn);font-size:.8rem">⏳ ${c.cola} vehículo${c.cola>1?'s':''} en cola</span>` : '';
+  const colaInfo = c.cola > 0 ? `<span style="color:var(--warn);font-size:.8rem;display:inline-flex;align-items:center;gap:.25rem">${ICONS.clock(12)} ${c.cola} vehículo${c.cola>1?'s':''} en cola</span>` : '';
   const u = Auth.get();
 
   document.getElementById('popup-content').innerHTML = `
@@ -232,11 +251,15 @@ leyenda.onAdd = () => {
   const div = L.DomUtil.create('div', '');
   div.style.cssText = 'background:white;padding:8px 10px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.8';
   div.innerHTML = `
-    <strong style="display:block;margin-bottom:4px;color:#1A2E44">Leyenda</strong>
-    <div>🟢 Disponible</div>
-    <div>🟠 Ocupado</div>
-    <div>⚫ Sin servicio</div>
-    <div style="margin-top:4px;color:#5C6B82;display:flex;align-items:center;gap:.3rem;font-size:.8rem"><span style="color:var(--accent)" data-icon="bolt" data-size="14"></span> Público &nbsp;·&nbsp; <span style="color:#8896A5">▪</span> Privado</div>
+    <strong style="display:block;margin-bottom:5px;color:#1A2E44;font-size:11px">Estado</strong>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#3BB273;flex-shrink:0"></span> Disponible</div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#E76F51;flex-shrink:0"></span> Ocupado</div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#9E9E9E;flex-shrink:0"></span> Sin servicio</div>
+    <hr style="border:none;border-top:1px solid #E5E7EB;margin:5px 0">
+    <div style="color:#5C6B82;display:flex;align-items:center;gap:4px;font-size:10px">
+      <span style="color:#2D7DD2;display:inline-flex">${ICONS.bolt(12)}</span> Público &nbsp;·&nbsp;
+      <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#9E9E9E;flex-shrink:0"></span> Privado
+    </div>
   `;
   return div;
 };

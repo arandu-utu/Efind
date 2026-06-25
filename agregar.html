@@ -3,14 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
   <title>Agregar cargador — E-Find</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <meta name="description" content="Registrá tu punto de carga en el mapa colaborativo de VE de Uruguay.">
+  <meta property="og:title"       content="Agregar cargador — E-Find">
+  <meta property="og:description" content="Registrá tu punto de carga en el mapa colaborativo de VE de Uruguay.">
+  <meta property="og:image"       content="https://efind.uy/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
 </head>
 <body>
 <nav class="navbar" id="navbar"></nav>
 
-<main class="main-content">
+<main class="main-content page-enter">
 <div class="container-sm">
   <h1 style="font-size:1.35rem;font-weight:900;color:var(--nav);margin-bottom:1.5rem">Agregar punto de carga</h1>
 
@@ -33,7 +43,7 @@
       </div>
     </div>
     <div id="mapa-nuevo" style="height:280px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);margin-bottom:.75rem"></div>
-    <p style="font-size:.8rem;color:var(--soft);margin-bottom:.75rem">💡 Hacé clic en el mapa para colocar el marcador con precisión.</p>
+    <div class="alert alert-info" style="font-size:.8rem;margin-bottom:.75rem"><span data-icon="info" data-size="14"></span> Hacé clic en el mapa para colocar el marcador con precisión.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
       <div class="form-group">
         <label class="form-label">Latitud</label>
@@ -106,18 +116,18 @@
 
   <!-- ── PASO 4: Confirmar ─────────────────────────────────── -->
   <div id="panel-3" class="card" style="display:none">
-    <div class="card__title">✅ Paso 4 — Confirmar</div>
+    <div class="card__title"><span data-icon="checkCircle" data-size="15"></span> Paso 4 — Confirmar</div>
     <div id="resumen-final" style="font-size:.9rem;line-height:1.8"></div>
     <div id="alert-agregar" style="display:none;margin-top:.75rem"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem">
       <button class="btn btn--ghost" onclick="irPaso(2)">← Volver</button>
-      <button class="btn btn--green btn--lg" onclick="guardar()">✔ Guardar cargador</button>
+      <button class="btn btn--green btn--lg" onclick="guardar()"><span data-icon="checkCircle" data-size="16"></span> Guardar cargador</button>
     </div>
   </div>
 
   <!-- ── ÉXITO ──────────────────────────────────────────────── -->
   <div id="panel-exito" class="card" style="display:none;text-align:center;padding:3rem 1.5rem">
-    <div style="font-size:3.5rem;margin-bottom:.75rem">✅</div>
+    <div id="success-icon" style="margin-bottom:1rem"></div>
     <h2 style="color:var(--nav);margin-bottom:.5rem">¡Cargador agregado!</h2>
     <p style="color:var(--soft);margin-bottom:1.5rem">Tu punto de carga ya está visible en el mapa.</p>
     <a href="index.html" class="btn btn--primary">Ver en el mapa</a>
@@ -283,6 +293,14 @@ function guardar() {
     document.getElementById('panel-exito').style.display = '';
   }, 900);
 }
+</script>
+<script>
+// Render success icon when panel is shown
+const _origGuardar = typeof guardar === 'function' ? guardar : null;
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('success-icon');
+  if (el) el.innerHTML = ICONS.reservedCheck(64);
+});
 </script>
 </body>
 </html>

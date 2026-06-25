@@ -207,6 +207,21 @@ const ICONS = {
      <path d="M9 12.75a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9z
               M9 9.75a.75.75 0 000 1.5h6a.75.75 0 000-1.5H9z"/>`),
 
+  /* Búsqueda --------------------------------------------------- */
+  search: px => _svg(px,
+    `<path fill-rule="evenodd" clip-rule="evenodd"
+      d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28
+         l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z"/>`),
+
+  /* Info ------------------------------------------------------- */
+  info: px => _svg(px,
+    `<path fill-rule="evenodd" clip-rule="evenodd"
+      d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75S21.75 6.615 21.75 12
+         s-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm8.706-1.442c1.146-.573 2.437.463
+         2.126 1.706l-.709 2.836.042-.02a.75.75 0 01.67 1.34l-.04.022c-1.147.573-2.438-.463
+         -2.127-1.706l.71-2.836-.042.02a.75.75 0 11-.671-1.34l.041-.022z
+         M12 9a.75.75 0 100-1.5.75.75 0 000 1.5z"/>`),
+
   /* ── Íconos custom E-Find (identidad uruguaya) ──────────────── */
 
   /**
@@ -223,7 +238,7 @@ const ICONS = {
 
   /**
    * Ícono de reserva exitosa — checkmark en círculo verde con rayo.
-   * Para reemplazar el 🎉 en la pantalla de comprobante.
+   * Para la pantalla de comprobante de reserva exitosa.
    * No usa currentColor — tiene colores propios de marca.
    */
   reservedCheck: (px = 64) =>

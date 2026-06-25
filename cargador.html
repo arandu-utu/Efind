@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
   <title>Detalle de cargador — E-Find</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -25,11 +29,17 @@
       font-size:.8rem; font-weight:600; margin:.2rem;
     }
   </style>
+  <meta name="description" content="Información completa del punto de carga: conectores, precio, horario, reseñas y disponibilidad.">
+  <meta property="og:title"       content="Detalle de cargador — E-Find">
+  <meta property="og:description" content="Información completa del punto de carga: conectores, precio, horario, reseñas y disponibilidad.">
+  <meta property="og:image"       content="https://efind.uy/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
 </head>
 <body>
 <nav class="navbar" id="navbar"></nav>
 
-<main class="main-content">
+<main class="main-content page-enter">
   <div class="container" id="page-content">
     <div style="display:flex;align-items:center;justify-content:center;height:200px">
       <span class="spinner"></span>
@@ -140,8 +150,9 @@ function renderPage() {
   const potMax    = Math.max(...C.conectores.map(x=>x.potencia));
   const prom      = promEstrellas(C.resenas);
   const precio    = C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito';
-  const colaText  = C.cola > 0 ? `⏳ ${C.cola} vehículo${C.cola>1?'s':''} en cola` : 'Sin espera';
+  const colaText  = C.cola > 0 ? `${ICONS.clock(13)} ${C.cola} vehículo${C.cola>1?'s':''} en cola` : 'Sin espera';
   const colaColor = C.cola > 0 ? 'var(--warn)' : 'var(--green)';
+  const colaFlex  = 'display:inline-flex;align-items:center;gap:.3rem';
 
   document.title = C.nombre + ' — E-Find';
 
@@ -242,9 +253,9 @@ function renderPage() {
           <div class="card__title">📡 Reportar estado en tiempo real</div>
           ${!U ? '<p style="font-size:.82rem;color:var(--soft)">Iniciá sesión para reportar.</p>' : `
             <div style="display:flex;flex-direction:column;gap:.5rem">
-              <button class="btn btn--green btn--sm" onclick="reportarEstado('disponible')">✅ Disponible</button>
-              <button class="btn btn--warn btn--sm"  onclick="reportarEstado('ocupado')">🔴 Ocupado</button>
-              <button class="btn btn--ghost btn--sm" onclick="reportarEstado('sin_servicio')">⚫ Fuera de servicio</button>
+              <button class="btn btn--green btn--sm" onclick="reportarEstado('disponible')">${ICONS.checkCircle(14)} Disponible</button>
+              <button class="btn btn--warn btn--sm"  onclick="reportarEstado('ocupado')">${ICONS.x(14)} Ocupado</button>
+              <button class="btn btn--ghost btn--sm" onclick="reportarEstado('sin_servicio')">${ICONS.xCircle(14)} Fuera de servicio</button>
             </div>
             <hr class="divider">
             <div class="form-group">

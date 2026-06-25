@@ -3,12 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
   <title>Mi perfil — E-Find</title>
   <link rel="stylesheet" href="css/style.css">
+  <meta name="description" content="Gestioná tu perfil, vehículos, cargadores e historial de recargas en E-Find.">
+  <meta property="og:title"       content="Mi perfil — E-Find">
+  <meta property="og:description" content="Gestioná tu perfil, vehículos, cargadores e historial de recargas en E-Find.">
+  <meta property="og:image"       content="https://efind.uy/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
 </head>
 <body>
 <nav class="navbar" id="navbar"></nav>
-<main class="main-content">
+<main class="main-content page-enter">
 <div class="container">
   <h1 style="font-size:1.35rem;font-weight:900;color:var(--nav);margin-bottom:1.5rem">Mi perfil</h1>
 
@@ -154,47 +164,57 @@ function renderCalificaciones() {
   const list  = document.getElementById('calificaciones-list');
 
   if (all.length === 0) {
-    block.innerHTML = '<p style="color:var(--soft);font-size:.9rem">Aún no tenés calificaciones de otros usuarios.</p>';
+    block.innerHTML = '<div class="empty-state"><div class="empty-state__icon">' + ICONS.sun(44) + '</div><div class="empty-state__title">Sin calificaciones</div><div class="empty-state__body">Aún no tenés calificaciones de otros usuarios.</div></div>';
     list.innerHTML = '';
     return;
   }
 
-  const prom = (all.reduce((s,c) => s + c.puntos, 0) / all.length).toFixed(1);
-  const filled = Math.round(prom);
-  block.innerHTML = \`
-    <div class="rating-summary">
-      <div>
-        <div class="rating-big-num">\${prom}</div>
-        <div class="rating-big-stars">\${Array.from({length:5},(_,i)=>`<span style="color:\${i<filled?'#F5B800':'#C8D3DF'}">\${solSVG(26)}</span>`).join('')}</div>
-      </div>
-      <div>
-        <div style="font-weight:600;font-size:.9rem">Calificación promedio</div>
-        <div class="rating-big-count">\${all.length} calificación\${all.length!==1?'es':''} recibida\${all.length!==1?'s':''}</div>
-      </div>
-    </div>
-  \`;
+  const prom   = (all.reduce((s, c) => s + c.puntos, 0) / all.length).toFixed(1);
+  const filled = Math.round(+prom);
+
+  // Build star row without nested template literals
+  const starsRow = Array.from({length: 5}, (_, i) =>
+    '<span style="color:' + (i < filled ? '#F5B800' : '#C8D3DF') + '">' + solSVG(26) + '</span>'
+  ).join('');
+
+  block.innerHTML =
+    '<div class="rating-summary">' +
+      '<div>' +
+        '<div class="rating-big-num">' + prom + '</div>' +
+        '<div class="rating-big-stars">' + starsRow + '</div>' +
+      '</div>' +
+      '<div>' +
+        '<div style="font-weight:600;font-size:.9rem">Calificación promedio</div>' +
+        '<div class="rating-big-count">' + all.length + ' calificación' + (all.length !== 1 ? 'es' : '') + ' recibida' + (all.length !== 1 ? 's' : '') + '</div>' +
+      '</div>' +
+    '</div>';
 
   const usuarios = getMock('usuarios');
-  list.innerHTML = all.map(c => {
-    const de = usuarios.find(u => u.id === c.de_usuario_id);
-    const av = de ? de.avatar : '?';
-    const nm = de ? de.nombre : 'Usuario';
-    const stars = Array.from({length:5},(_,i)=>`<span style=\"color:\${i<c.puntos?'#F5B800':'#C8D3DF'}\">\${solSVG(14)}</span>`).join('');
-    const tipo = c.tipo === 'propietario_a_cliente' ? 'Como cliente' : 'Como propietario';
-    return \`
-      <div class="cal-item">
-        <div class="cal-avatar">\${av}</div>
-        <div class="cal-body">
-          <div class="cal-header">
-            <span class="cal-name">\${nm}</span>
-            <span class="cal-stars">\${stars}</span>
-            <span class="cal-date">\${c.fecha}</span>
-          </div>
-          <div class="cal-tipo">\${tipo}</div>
-          \${c.comentario ? \`<div class="cal-text">"\${c.comentario}"</div>\` : ''}
-        </div>
-      </div>
-    \`;
+  list.innerHTML = all.map(function(c) {
+    const de    = usuarios.find(u => u.id === c.de_usuario_id);
+    const av    = de ? de.avatar : '?';
+    const nm    = de ? de.nombre : 'Usuario';
+    const tipo  = c.tipo === 'propietario_a_cliente' ? 'Como cliente' : 'Como propietario';
+    const stars = Array.from({length: 5}, (_, i) =>
+      '<span style="color:' + (i < c.puntos ? '#F5B800' : '#C8D3DF') + '">' + solSVG(14) + '</span>'
+    ).join('');
+    const comment = c.comentario
+      ? '<div class="cal-text">"' + c.comentario + '"</div>'
+      : '';
+    return (
+      '<div class="cal-item">' +
+        '<div class="cal-avatar">' + av + '</div>' +
+        '<div class="cal-body">' +
+          '<div class="cal-header">' +
+            '<span class="cal-name">'  + nm    + '</span>' +
+            '<span class="cal-stars">' + stars + '</span>' +
+            '<span class="cal-date">'  + c.fecha + '</span>' +
+          '</div>' +
+          '<div class="cal-tipo">' + tipo + '</div>' +
+          comment +
+        '</div>' +
+      '</div>'
+    );
   }).join('');
 }
 renderCalificaciones();
@@ -287,7 +307,11 @@ function renderHistorial() {
           </tr>`;
         }).join('')}
       </tbody>
-    </table>` : '<p style="font-size:.88rem;color:var(--soft)">Sin transacciones aún.</p>';
+    </table>` : `<div class="empty-state">
+        <div class="empty-state__icon">${ICONS.clock(44)}</div>
+        <div class="empty-state__title">Sin historial</div>
+        <div class="empty-state__body">Tus recargas aparecerán acá una vez que realices tu primera reserva.</div>
+      </div>`;
 }
 
 function logout() {
