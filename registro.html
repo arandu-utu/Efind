@@ -220,17 +220,30 @@ document.getElementById('reg-form').addEventListener('submit', e => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Creando cuenta…';
 
-  setTimeout(() => {
-    const result = Auth.register({ nombre, email, ci_rut: ci, rol: rolActual, empresa });
-    if (result.ok) {
+  // Registro con la API real
+  fetch('/api/registro.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre, email, password: pwd }),
+  })
+  .then(r => r.json())
+  .then(json => {
+    if (json.ok) {
+      // Guardar en localStorage para que la navbar lo lea
+      localStorage.setItem(Auth.KEY, JSON.stringify(json.data));
       mostrarAlert('✓ ¡Cuenta creada! Redirigiendo…', 'success');
-      setTimeout(() => location.href = 'index.html', 900);
+      setTimeout(() => location.href = 'login.html', 900);
     } else {
-      mostrarAlert('✗ ' + result.error);
+      mostrarAlert('✗ ' + (json.error || 'Error al crear la cuenta'));
       btn.disabled = false;
       btn.textContent = 'Crear cuenta';
     }
-  }, 700);
+  })
+  .catch(() => {
+    mostrarAlert('✗ Error de conexión con el servidor');
+    btn.disabled = false;
+    btn.textContent = 'Crear cuenta';
+  });
 });
 </script>
 </body>

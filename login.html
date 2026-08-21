@@ -141,21 +141,42 @@ document.getElementById('login-form').addEventListener('submit', e => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Ingresando…';
 
-  setTimeout(() => {
-    const result = Auth.login(email, pwd);
-    if (result.ok) {
+  // Autenticación con la API real
+  fetch('/api/login.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: pwd }),
+  })
+  .then(r => {
+    console.log('[login] HTTP status:', r.status, r.headers.get('content-type'));
+    return r.json();
+  })
+  .then(json => {
+    console.log('[login] JSON recibido:', JSON.stringify(json));
+    if (json.ok) {
+      console.log('[login] ok=true, data:', json.data);
+      localStorage.setItem(Auth.KEY, JSON.stringify(json.data));
+      console.log('[login] localStorage[', Auth.KEY, '] =', localStorage.getItem(Auth.KEY));
       mostrarAlert('✓ Sesión iniciada. Redirigiendo…', 'success');
       setTimeout(() => {
         const dest = sessionStorage.getItem('redirect_after_login') || 'index.html';
         sessionStorage.removeItem('redirect_after_login');
+        console.log('[login] Redirigiendo a:', dest);
         location.href = dest;
       }, 700);
     } else {
-      mostrarAlert('✗ ' + result.error);
+      console.warn('[login] ok=false:', json.error);
+      mostrarAlert('✗ ' + (json.error || 'Credenciales incorrectas'));
       btn.disabled = false;
       btn.textContent = 'Iniciar sesión';
     }
-  }, 600);
+  })
+  .catch(err => {
+    console.error('[login] Error de fetch/parse:', err);
+    mostrarAlert('✗ Error de conexión con el servidor');
+    btn.disabled = false;
+    btn.textContent = 'Iniciar sesión';
+  });
 });
 </script>
 </body>

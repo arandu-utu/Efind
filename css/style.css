@@ -245,6 +245,7 @@ button { cursor: pointer; font-family: inherit; }
 .badge-gray   { background: #EBEBEB; color: #5C5C5C; }
 .badge-blue   { background: #EBF4FF; color: #1A5FA6; }
 .badge-red    { background: #FEECEC; color: #9B1C1C; }
+.badge-ute    { background: #E8EEF9; color: #1B4F9C; }
 .badge::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
 /* ── Alertas ─────────────────────────────────────────────────── */

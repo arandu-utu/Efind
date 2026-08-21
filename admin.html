@@ -91,145 +91,170 @@
 <script>
 requireAdmin();
 
-const stats   = MOCK.stats;
-const usuarios = getMock('usuarios');
+/* Estado global */
+let resenas  = [];
+let reportes = [];
 
-/* ── KPIs ───────────────────────────────────────────────────── */
-const kpis = [
-  { label:'Cargadores totales', value: getMock('cargadores').length, diff:'+1 este mes', ico:'bolt' },
-  { label:'Usuarios registrados', value: usuarios.length, diff:'+2 este mes', ico:'user' },
-  { label:'Reseñas pendientes', value: getMock('resenas_pendientes').filter(r=>r.estado==='pendiente').length, diff:'', ico:'sun' },
-  { label:'Reportes abiertos', value: getMock('reportes').filter(r=>r.estado==='pendiente').length, diff:'', ico:'warning' },
-];
-document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
-  <div class="kpi-card">
-    <div class="kpi-label">${ICONS[k.ico]?.(20)||k.ico} ${k.label}</div>
-    <div class="kpi-value">${k.value}</div>
-    ${k.diff ? `<div class="kpi-diff">${k.diff}</div>` : ''}
-  </div>`).join('');
+/* ── Carga inicial: todas las APIs en paralelo ───────────────── */
+async function initDashboard() {
+  try {
+    const [sRes, rRes, reRes, eRes] = await Promise.all([
+      fetch('/api/stats.php').then(r => r.json()),
+      fetch('/api/reportes.php').then(r => r.json()),
+      fetch('/api/resenas.php').then(r => r.json()),
+      fetch('/api/estaciones.php?limit=5').then(r => r.json()),
+    ]);
 
-/* ── Gráfico de barras ──────────────────────────────────────── */
-const datos = stats.cargadores_por_mes;
-const maxD  = Math.max(...datos, 1);
-document.getElementById('bar-chart').innerHTML = datos.map((v,i)=>`
-  <div class="bar-col">
-    <div class="bar" style="height:${Math.round((v/maxD)*100)}px;background:${v?'var(--accent)':'var(--border)'}"></div>
-  </div>`).join('');
-document.getElementById('bar-labels').innerHTML = stats.meses.map(m=>`
-  <div class="bar-col"><div class="bar-label">${m}</div></div>`).join('');
+    if (sRes.ok)  renderStats(sRes.data);
+    if (rRes.ok)  { reportes = rRes.data;  renderReportes(); }
+    if (reRes.ok) { resenas  = reRes.data; renderResenas();  }
+    if (eRes.ok)  renderCargadores(eRes.data);
 
-/* ── Donut simple con Canvas ─────────────────────────────────── */
-const rolesCount = { particular:0, empresa:0, moderador:0, admin:0 };
-usuarios.forEach(u => rolesCount[u.rol] = (rolesCount[u.rol]||0)+1);
-const colores = ['#2D7DD2','#3BB273','#E76F51','#1A2E44'];
-const roleNames = ['Particular','Empresa','Moderador','Admin'];
-const vals = Object.values(rolesCount);
-const total = vals.reduce((a,b)=>a+b,0)||1;
+  } catch (e) {
+    console.error('Error al cargar dashboard:', e);
+  }
+}
 
-const canvas = document.getElementById('donut-canvas');
-const ctx    = canvas.getContext('2d');
-let ang = -Math.PI/2;
-vals.forEach((v,i)=>{
-  const slice = (v/total)*Math.PI*2;
-  ctx.beginPath();
-  ctx.moveTo(80,80);
-  ctx.arc(80,80,70,ang,ang+slice);
-  ctx.closePath();
-  ctx.fillStyle = colores[i];
-  ctx.fill();
-  ang += slice;
-});
-/* Donut hole */
-ctx.beginPath();
-ctx.arc(80,80,42,0,Math.PI*2);
-ctx.fillStyle='#fff';
-ctx.fill();
-ctx.fillStyle='#1A2E44';
-ctx.font='bold 22px system-ui';
-ctx.textAlign='center';
-ctx.fillText(total,80,85);
+/* ── KPIs + gráficos ─────────────────────────────────────────── */
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
-document.getElementById('donut-legend').innerHTML = roleNames.map((n,i)=>`
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-    <span style="width:10px;height:10px;border-radius:2px;background:${colores[i]};display:inline-block"></span>
-    ${n}: <strong>${vals[i]}</strong>
-  </div>`).join('');
+function renderStats(s) {
+  /* KPIs */
+  const kpis = [
+    { label:'Cargadores totales',   value: s.cargadores_total,   diff:'+1 este mes', ico:'bolt'    },
+    { label:'Usuarios registrados', value: s.usuarios_total,     diff:'+2 este mes', ico:'user'    },
+    { label:'Reseñas pendientes',   value: s.resenas_pendientes, diff:'',            ico:'sun'     },
+    { label:'Reportes abiertos',    value: s.reportes_abiertos,  diff:'',            ico:'warning' },
+  ];
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
+    <div class="kpi-card">
+      <div class="kpi-label">${ICONS[k.ico]?.(20)||k.ico} ${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      ${k.diff ? `<div class="kpi-diff">${k.diff}</div>` : ''}
+    </div>`).join('');
+
+  /* Gráfico de barras */
+  const datos = s.cargadores_por_mes;
+  const maxD  = Math.max(...datos, 1);
+  document.getElementById('bar-chart').innerHTML = datos.map(v=>`
+    <div class="bar-col">
+      <div class="bar" style="height:${Math.round((v/maxD)*100)}px;background:${v?'var(--accent)':'var(--border)'}"></div>
+    </div>`).join('');
+  document.getElementById('bar-labels').innerHTML = MESES.map(m=>`
+    <div class="bar-col"><div class="bar-label">${m}</div></div>`).join('');
+
+  /* Donut de roles */
+  const roleOrder  = ['particular', 'propietario', 'admin'];
+  const roleLabels = ['Particular', 'Propietario', 'Admin'];
+  const colores    = ['#2D7DD2', '#3BB273', '#1A2E44'];
+  const vals  = roleOrder.map(r => s.usuarios_por_rol[r] || 0);
+  const total = vals.reduce((a,b)=>a+b,0) || 1;
+
+  const canvas = document.getElementById('donut-canvas');
+  const ctx    = canvas.getContext('2d');
+  let ang = -Math.PI/2;
+  vals.forEach((v,i) => {
+    const slice = (v/total)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(80,80);
+    ctx.arc(80,80,70,ang,ang+slice); ctx.closePath();
+    ctx.fillStyle = colores[i]; ctx.fill();
+    ang += slice;
+  });
+  /* Hueco donut */
+  ctx.beginPath(); ctx.arc(80,80,42,0,Math.PI*2);
+  ctx.fillStyle='#fff'; ctx.fill();
+  ctx.fillStyle='#1A2E44'; ctx.font='bold 22px system-ui';
+  ctx.textAlign='center'; ctx.fillText(total,80,85);
+
+  document.getElementById('donut-legend').innerHTML = roleLabels.map((n,i)=>`
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+      <span style="width:10px;height:10px;border-radius:2px;background:${colores[i]};display:inline-block"></span>
+      ${n}: <strong>${vals[i]}</strong>
+    </div>`).join('');
+}
 
 /* ── Reseñas pendientes ─────────────────────────────────────── */
 function renderResenas() {
-  const pend = getMock('resenas_pendientes').filter(r=>r.estado==='pendiente');
-  const el = document.getElementById('lista-resenas-pend');
+  const pend = resenas.filter(r => r.estado === 'pendiente');
+  const el   = document.getElementById('lista-resenas-pend');
   el.innerHTML = pend.length ? `
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Usuario</th><th>Cargador</th><th>Estrellas</th><th>Comentario</th><th>Acciones</th></tr></thead>
-        <tbody>
-          ${pend.map(r=>`<tr>
-            <td>${r.usuario}</td>
-            <td>${r.cargador_nombre}</td>
-            <td><span style="display:inline-flex;align-items:center;gap:1px">${Array.from({length:5},(_,i)=>`<span style="color:${i<r.estrellas?'#F5B800':'#C8D3DF'}">${solSVG(14)}</span>`).join('')}</span></td>
-            <td style="font-size:.82rem">${r.texto}</td>
-            <td style="white-space:nowrap">
-              <button class="btn btn--green btn--sm" onclick="modResena(${r.id},'aprobada')">${ICONS.checkCircle(14)} Aprobar</button>
-              <button class="btn btn--warn btn--sm"  onclick="modResena(${r.id},'rechazada')">${ICONS.xCircle(14)} Rechazar</button>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>` : '<p style="font-size:.88rem;color:var(--soft)">Sin reseñas pendientes. ✓</p>';
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Usuario</th><th>Cargador</th><th>Estrellas</th><th>Comentario</th><th>Acciones</th></tr></thead>
+      <tbody>${pend.map(r=>`<tr>
+        <td>${r.usuario_nombre}</td>
+        <td>${r.cargador_nombre}</td>
+        <td><span style="display:inline-flex;align-items:center;gap:1px">
+          ${Array.from({length:5},(_,i)=>`<span style="color:${i<r.estrellas?'#F5B800':'#C8D3DF'}">${solSVG(14)}</span>`).join('')}
+        </span></td>
+        <td style="font-size:.82rem">${r.texto || ''}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn--green btn--sm" onclick="modResena(${r.id},'aprobada')">${ICONS.checkCircle(14)} Aprobar</button>
+          <button class="btn btn--warn btn--sm"  onclick="modResena(${r.id},'rechazada')">${ICONS.xCircle(14)} Rechazar</button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table></div>`
+    : '<p style="font-size:.88rem;color:var(--soft)">Sin reseñas pendientes. ✓</p>';
 }
 
-function modResena(id, estado) {
-  const lista = getMock('resenas_pendientes');
-  const idx = lista.findIndex(r=>r.id===id);
-  lista[idx].estado = estado;
-  setMock('resenas_pendientes', lista);
-  renderResenas();
+async function modResena(id, estado) {
+  const res = await fetch('/api/resenas.php', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ id, estado }),
+  }).then(r => r.json());
+  if (res.ok) {
+    const item = resenas.find(x => x.id === id);
+    if (item) item.estado = estado;
+    renderResenas();
+  }
 }
 
-/* ── Reportes ───────────────────────────────────────────────── */
+/* ── Reportes abiertos ──────────────────────────────────────── */
 function renderReportes() {
-  const pend = getMock('reportes').filter(r=>r.estado==='pendiente');
-  const el = document.getElementById('lista-reportes');
+  const pend = reportes.filter(r => !+r.resuelto);
+  const el   = document.getElementById('lista-reportes');
   el.innerHTML = pend.length ? `
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Cargador</th><th>Tipo</th><th>Reportado por</th><th>Credibilidad</th><th>Fecha</th><th>Acción</th></tr></thead>
-        <tbody>
-          ${pend.map(r=>`<tr>
-            <td><a href="cargador.html?id=${r.cargador_id}">${r.cargador_nombre}</a></td>
-            <td>${r.tipo}</td>
-            <td>${r.usuario}</td>
-            <td>${credibilidadBadge(r.usuario_id)}</td>
-            <td>${r.fecha}</td>
-            <td><button class="btn btn--green btn--sm" onclick="resolverReporte(${r.id})">Resolver</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>` : '<p style="font-size:.88rem;color:var(--soft)">Sin reportes pendientes. ✓</p>';
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Cargador</th><th>Tipo</th><th>Descripción</th><th>Reportado por</th><th>Fecha</th><th>Acción</th></tr></thead>
+      <tbody>${pend.map(r=>`<tr>
+        <td><a href="cargador.html?id=${r.punto_carga_id}">${r.punto_carga_nombre || 'Cargador #'+r.punto_carga_id}</a></td>
+        <td>${r.tipo}</td>
+        <td style="font-size:.82rem">${r.descripcion || '—'}</td>
+        <td>${r.usuario_nombre || '—'}</td>
+        <td>${r.creado_en ? r.creado_en.slice(0,10) : ''}</td>
+        <td><button class="btn btn--green btn--sm" onclick="resolverReporte(${r.id})">Resolver</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`
+    : '<p style="font-size:.88rem;color:var(--soft)">Sin reportes pendientes. ✓</p>';
 }
 
-function resolverReporte(id) {
-  const lista = getMock('reportes');
-  const idx = lista.findIndex(r=>r.id===id);
-  lista[idx].estado = 'resuelto';
-  setMock('reportes', lista);
-  renderReportes();
+async function resolverReporte(id) {
+  const res = await fetch('/api/reportes.php', {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ id }),
+  }).then(r => r.json());
+  if (res.ok) {
+    const item = reportes.find(x => x.id === id);
+    if (item) item.resuelto = 1;
+    renderReportes();
+  }
 }
 
 /* ── Últimos cargadores ─────────────────────────────────────── */
-const badgeMap = {disponible:'badge-green',ocupado:'badge-orange',sin_servicio:'badge-gray'};
-document.getElementById('tbody-cargadores').innerHTML =
-  getMock('cargadores').slice(-5).reverse().map(c=>`<tr>
+const badgeMap = { disponible:'badge-green', ocupado:'badge-orange', sin_servicio:'badge-gray' };
+function renderCargadores(lista) {
+  document.getElementById('tbody-cargadores').innerHTML = lista.map(c=>`<tr>
     <td><a href="cargador.html?id=${c.id}">${c.nombre}</a></td>
-    <td style="font-size:.82rem;color:var(--soft)">${c.direccion}</td>
-    <td><span class="badge ${badgeMap[c.estado]}">${c.estado}</span></td>
-    <td style="font-size:.82rem">${c.conectores.map(x=>x.tipo).join(', ')}</td>
+    <td style="font-size:.82rem;color:var(--soft)">${c.acceso || ''}</td>
+    <td><span class="badge ${badgeMap[c.estado]||''}">${c.estado}</span></td>
+    <td style="font-size:.82rem">${c.tipos_conectores || '—'}</td>
     <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
   </tr>`).join('');
+}
 
-renderResenas();
-renderReportes();
+/* ── Init ─────────────────────────────────────────────────────── */
+initDashboard();
 </script>
 </body>
 </html>

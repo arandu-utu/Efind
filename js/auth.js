@@ -46,18 +46,23 @@ const Auth = {
 
   logout() {
     localStorage.removeItem(this.KEY);
+    // Destruir sesión PHP en el servidor (fire & forget)
+    fetch('/api/logout.php').catch(() => {});
   },
 
   is(role) {
     const u = this.get();
     if (!u) return false;
     if (role === 'auth') return true;
+    // Soporta tanto rol_id numérico (API real) como string (mock legacy)
+    if (role === 'admin')     return u.rol_id === 1 || u.rol === 'admin';
+    if (role === 'propietario') return u.rol_id === 3 || u.rol === 'propietario';
     return u.rol === role;
   },
 
   isAny(...roles) {
     const u = this.get();
-    return u ? roles.includes(u.rol) : false;
+    return u ? roles.some(r => this.is(r)) : false;
   },
 };
 
@@ -78,7 +83,7 @@ function validarRUT(rut) {
 /* ── Inyección dinámica de navbar/footer ─────────────────────── */
 function renderNavbar() {
   const u = Auth.get();
-  const isAdmin = u && (u.rol === 'admin' || u.rol === 'moderador');
+  const isAdmin = u && (u.rol_id === 1 || u.rol === 'admin' || u.rol === 'moderador');
 
   const nav = document.getElementById('navbar');
   if (!nav) return;
@@ -95,12 +100,12 @@ function renderNavbar() {
           <a href="agregar.html" class="btn btn--green btn--sm">+ Agregar</a>
           <div class="navbar__user" id="user-menu">
             <div class="user-chip">
-              <div class="avatar">${u.avatar}</div>
+              <div class="avatar">${u.avatar || u.nombre[0].toUpperCase()}</div>
               ${u.nombre.split(' ')[0]}
             </div>
             <div class="dropdown">
               <a href="perfil.html">${ICONS.user(15)} Mi perfil</a>
-              ${isAdmin ? '<a href="admin.html">${ICONS.settings(15)} Administración</a>' : ''}
+              ${isAdmin ? `<a href="admin.html">${ICONS.settings(15)} Administración</a>` : ''}
               <div class="sep"></div>
               <button onclick="Auth.logout(); location.href='login.html'">${ICONS.logout(15)} Cerrar sesión</button>
             </div>
@@ -151,7 +156,8 @@ function requireAuth(redirectTo = 'login.html') {
 /* ── Guard: redirige si no es admin/moderador ────────────────── */
 function requireAdmin(redirectTo = 'index.html') {
   const u = Auth.get();
-  if (!u || !['admin','moderador'].includes(u.rol)) {
+  const isAdmin = u && (u.rol_id === 1 || u.rol === 'admin' || u.rol === 'moderador');
+  if (!isAdmin) {
     location.href = redirectTo;
     return false;
   }

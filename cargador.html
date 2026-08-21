@@ -98,19 +98,60 @@
 <script src="js/auth.js"></script>
 <script src="js/estimador.js"></script>
 <script>
+/* ── Carga de datos desde la API real ───────────────────────── */
 const ID = +cargadorIdFromURL();
-const C  = getCargador(ID);
 const U  = Auth.get();
+let C = null;   // se rellena con datos de la API
 
-if (!C) {
+(async () => {
+  if (!ID) { mostrarError('ID de cargador no especificado.'); return; }
+
+  try {
+    const res  = await fetch(`/api/estacion.php?id=${ID}`);
+    const json = await res.json();
+
+    if (!json.ok) { mostrarError(json.error || 'Cargador no encontrado.'); return; }
+
+    const e = json.data;
+
+    // Mapear respuesta de la API al formato esperado por renderPage()
+    C = {
+      id:            e.id,
+      nombre:        e.nombre,
+      lat:           parseFloat(e.lat),
+      lng:           parseFloat(e.lng),
+      estado:        e.estado,
+      acceso:        e.acceso,
+      publica:       e.acceso === 'publico',
+      fuente:        e.fuente || 'efind',
+      direccion:     e.nombre,          // sin dirección detallada aún
+      horario:       '24/7',            // sin horario en BD aún
+      costo_kwh:     null,              // sin precio en BD aún
+      cola:          0,
+      propietario_id: null,
+      // Conectores: [{tipo, potencia}]
+      conectores: (e.conectores || []).map(c => ({
+        tipo:     c.tipo,
+        potencia: parseFloat(c.potencia_kw),
+      })),
+      resenas: [],  // módulo de reseñas en próxima entrega
+    };
+
+    renderPage();
+
+  } catch (err) {
+    console.error('Error cargando cargador:', err);
+    mostrarError('Error de conexión con el servidor.');
+  }
+})();
+
+function mostrarError(msg) {
   document.getElementById('page-content').innerHTML = `
     <div style="text-align:center;padding:4rem 1rem">
       ${ICONS.warning(56)}
-      <h2>Cargador no encontrado</h2>
+      <h2>${msg}</h2>
       <a href="index.html" class="btn btn--primary" style="margin-top:1rem">Volver al mapa</a>
     </div>`;
-} else {
-  renderPage();
 }
 
 function stars(n, max=5) {
@@ -147,7 +188,7 @@ function promEstrellas(resenas) {
 function renderPage() {
   const badgeMap  = { disponible:'badge-green', ocupado:'badge-orange', sin_servicio:'badge-gray' };
   const labelMap  = { disponible:'Disponible', ocupado:'Ocupado', sin_servicio:'Sin servicio' };
-  const potMax    = Math.max(...C.conectores.map(x=>x.potencia));
+  const potMax    = C.conectores.length ? Math.max(...C.conectores.map(x=>x.potencia)) : '—';
   const prom      = promEstrellas(C.resenas);
   const precio    = C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito';
   const colaText  = C.cola > 0 ? `${ICONS.clock(13)} ${C.cola} vehículo${C.cola>1?'s':''} en cola` : 'Sin espera';
@@ -185,7 +226,7 @@ function renderPage() {
             <dt>Precio</dt><dd>${precio}</dd>
             <dt>Potencia máx.</dt><dd>${potMax} kW</dd>
             <dt>Tipo de acceso</dt><dd>${C.publica ? 'Público' : 'Privado / Alquiler'}</dd>
-            <dt>Propietario</dt><dd>${(() => { const o = getUsuario(C.propietario_id); return o ? o.nombre + ' ' + renderStars(o.calificacion_promedio, o.num_calificaciones) : '—'; })()}</dd>
+            <dt>Fuente</dt><dd>${C.fuente === 'ute' ? 'Red UTE CargaME' : 'E-Find'}</dd>
           </dl>
           <div style="margin-top:.9rem">
             <div style="font-size:.78rem;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Conectores disponibles</div>
@@ -284,9 +325,8 @@ function renderPage() {
     { attribution:'&copy; OpenStreetMap' }).addTo(mm);
   L.marker([C.lat, C.lng]).addTo(mm);
 
-  /* Estimador */
-  const vehsUsuario = U ? getMock('vehiculos').filter(v => v.usuario_id === U.id) : [];
-  montarEstimador(document.getElementById('estimador-widget'), C, vehsUsuario);
+  /* Estimador — sin vehículos reales aún (próxima entrega) */
+  montarEstimador(document.getElementById('estimador-widget'), C, []);
 }
 
 /* ── Modal reseña ──────────────────────────────────────────── */
@@ -319,51 +359,50 @@ function enviarResena() {
     al.style.display = 'flex';
     return;
   }
-  const cargadores = getMock('cargadores');
-  const idx = cargadores.findIndex(x => x.id === C.id);
-  cargadores[idx].resenas.unshift({
-    usuario: U.nombre, estrellas: estrellasSel,
-    texto: document.getElementById('txt-resena').value || '—',
-    fecha: new Date().toISOString().slice(0,10),
-  });
-  setMock('cargadores', cargadores);
+  // TODO: POST a /api/resenas.php (próxima entrega)
   cerrarResena();
-  renderPage();
+  mostrarFeedback('crowd-feedback', '✓ Reseña recibida, gracias! (Se publicará cuando el módulo esté completo.)', 'success');
 }
 
 /* ── Modal reporte ─────────────────────────────────────────── */
 function abrirReporte()  { document.getElementById('modal-reporte').style.display = 'flex'; }
 function cerrarReporte() { document.getElementById('modal-reporte').style.display = 'none'; }
 
-function enviarReporte() {
-  const reportes = getMock('reportes');
-  reportes.push({
-    id: Date.now(), cargador_id: C.id,
-    cargador_nombre: C.nombre,
-    tipo: document.getElementById('tipo-reporte').value,
-    usuario: U.nombre,
-    fecha: new Date().toISOString().slice(0,10),
-    estado: 'pendiente',
-  });
-  setMock('reportes', reportes);
-  cerrarReporte();
-  mostrarFeedback('crowd-feedback', '✓ Reporte enviado, gracias por contribuir.', 'success');
+async function enviarReporte() {
+  const tipo = document.getElementById('tipo-reporte').value;
+  const desc = document.getElementById('txt-reporte').value;
+  try {
+    const res  = await fetch('/api/reportes.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        punto_carga_id: C.id,
+        tipo,
+        descripcion: desc || null,
+      }),
+    });
+    const json = await res.json();
+    cerrarReporte();
+    if (json.ok) {
+      mostrarFeedback('crowd-feedback', '✓ Reporte enviado, gracias por contribuir.', 'success');
+    } else {
+      mostrarFeedback('crowd-feedback', json.error || 'Error al enviar el reporte.', 'warn');
+    }
+  } catch {
+    cerrarReporte();
+    mostrarFeedback('crowd-feedback', 'Error de conexión al enviar el reporte.', 'warn');
+  }
 }
 
-/* ── Crowdsourcing ─────────────────────────────────────────── */
+/* ── Crowdsourcing (TODO: conectar a /api/crowdsource.php en próxima entrega) */
 function reportarEstado(estado) {
-  const lista = getMock('cargadores');
-  const idx = lista.findIndex(x => x.id === C.id);
-  lista[idx].estado = estado;
-  setMock('cargadores', lista);
+  // Actualización local mientras se desarrolla el módulo de crowdsourcing
+  C.estado = estado;
   mostrarFeedback('crowd-feedback', `✓ Estado actualizado a "${estado.replace('_',' ')}".`, 'success');
 }
 function reportarCola() {
   const cola = +document.getElementById('sel-cola').value;
-  const lista = getMock('cargadores');
-  const idx = lista.findIndex(x => x.id === C.id);
-  lista[idx].cola = cola;
-  setMock('cargadores', lista);
+  C.cola = cola;
   mostrarFeedback('crowd-feedback', `✓ Cola actualizada a ${cola} vehículo${cola!==1?'s':''}.`, 'success');
 }
 

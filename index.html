@@ -50,6 +50,7 @@
           <label class="check-row"><input type="checkbox" class="f-tipo" value="CCS2"     checked> CCS2</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="CHAdeMO"  checked> CHAdeMO</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="Schuko"   checked> Schuko</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="GB/T"     checked> GB/T</label>
         </div>
 
         <div class="filter-section">
@@ -73,6 +74,14 @@
           <div class="filter-title">Acceso</div>
           <label class="check-row"><input type="checkbox" class="f-acceso" value="publico"  checked> Público</label>
           <label class="check-row"><input type="checkbox" class="f-acceso" value="privado"  checked> Privado / Alquiler</label>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-title">Fuente</div>
+          <label class="check-row">
+            <input type="checkbox" id="f-ute" checked>
+            Red UTE <span class="badge badge-ute" style="font-size:.65rem;padding:.1rem .4rem">UTE</span>
+          </label>
         </div>
 
         <div style="padding:.6rem 1rem">
@@ -102,6 +111,7 @@
 <script src="js/icons.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/estimador.js"></script>
+<script src="js/ute-service.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════
    MAPA PRINCIPAL
@@ -115,13 +125,14 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
 }).addTo(map);
 
-// ── Íconos por estado ────────────────────────────────────────
+// ── Paleta de colores por estado ─────────────────────────────
 const COLORES = {
   disponible:   { fill: '#3BB273', border: '#2A8F59' },
   ocupado:      { fill: '#E76F51', border: '#C4532A' },
   sin_servicio: { fill: '#9E9E9E', border: '#6B6B6B' },
 };
 
+// ── Ícono E-Find (círculo = público, cuadrado = privado) ─────
 function crearIcono(estado, publica) {
   const c = COLORES[estado] || COLORES.sin_servicio;
   const shape = publica
@@ -139,7 +150,27 @@ function crearIcono(estado, publica) {
   });
 }
 
-// ── Marcadores ───────────────────────────────────────────────
+// ── Ícono UTE (diamante con "U") ─────────────────────────────
+function crearIconoUTE(estado) {
+  const c = COLORES[estado] || COLORES.sin_servicio;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
+    <g transform="translate(13,13) rotate(45)">
+      <rect x="-8" y="-8" width="16" height="16" rx="2"
+            fill="${c.fill}" stroke="#1B4F9C" stroke-width="2.5"/>
+    </g>
+    <text x="13" y="17" text-anchor="middle"
+          font-family="Arial,sans-serif" font-weight="900"
+          font-size="9" fill="white">U</text>
+  </svg>`;
+  return L.divIcon({
+    className: '',
+    html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))">${svg}</div>`,
+    iconSize:   [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
+// ── Estado E-Find ────────────────────────────────────────────
 let marcadores = [];
 let cargadoresFiltrados = [];
 
@@ -154,10 +185,42 @@ function renderMarcadores(lista) {
   });
 }
 
-// ── Lista lateral ────────────────────────────────────────────
-function renderLista(lista) {
+// ── Estado UTE ───────────────────────────────────────────────
+let uteEstaciones = [];    // Cache de estaciones UTE (cargado al inicio)
+let uteMarkers    = [];    // Marcadores Leaflet activos de UTE
+let _uteFiltered  = [];    // Estaciones UTE del último filtrado (para irAUTE)
+
+function renderMarcadoresUTE(lista) {
+  uteMarkers.forEach(m => map.removeLayer(m));
+  uteMarkers = [];
+  lista.forEach(c => {
+    const m = L.marker([c.lat, c.lng], { icon: crearIconoUTE(c.estado) })
+      .addTo(map)
+      .on('click', () => abrirPopupUTE(c));
+    uteMarkers.push(m);
+  });
+}
+
+// ── Lista lateral (E-Find + UTE mezclados) ───────────────────
+const _BADGE = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' };
+const _LABEL = { disponible: 'Disponible',  ocupado: 'Ocupado',      sin_servicio: 'Sin servicio' };
+
+function renderLista(efindLista, uteLista) {
   const el = document.getElementById('charger-list');
-  if (!lista.length) {
+
+  // Guardar referencia de UTE para irAUTE()
+  _uteFiltered = uteLista;
+
+  // Combinar ambas fuentes y ordenar: disponible → ocupado → sin_servicio
+  const PESO = { disponible: 0, ocupado: 1, sin_servicio: 2 };
+  const efind = efindLista.map(c => ({ ...c, _src: 'efind' }));
+  const ute   = uteLista.map((c, i) => ({ ...c, _src: 'ute', _idx: i }));
+  const todos = [...efind, ...ute].sort((a, b) => {
+    const d = (PESO[a.estado] ?? 3) - (PESO[b.estado] ?? 3);
+    return d !== 0 ? d : a.nombre.localeCompare(b.nombre);
+  });
+
+  if (!todos.length) {
     el.innerHTML = `<div class="empty-state" style="padding:2rem 1rem">
       <div class="empty-state__icon">${ICONS.bolt(40)}</div>
       <div class="empty-state__title">Sin cargadores</div>
@@ -165,8 +228,24 @@ function renderLista(lista) {
     </div>`;
     return;
   }
-  el.innerHTML = lista.map(c => {
-    const badgeClass = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' }[c.estado];
+
+  el.innerHTML = todos.map(c => {
+    const badge = _BADGE[c.estado] ?? 'badge-gray';
+    const label = _LABEL[c.estado] ?? c.estado;
+
+    if (c._src === 'ute') {
+      return `
+        <div class="charger-item" onclick="irAUTE(${c._idx})">
+          <div class="charger-item__info">
+            <strong>${c.nombre}
+              <span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem;vertical-align:middle">UTE</span>
+            </strong>
+            <span>${c.direccion.split(',')[0]} · ${c.potenciaMax} kW</span>
+          </div>
+          <span class="badge ${badge}" style="font-size:.7rem">${label}</span>
+        </div>`;
+    }
+
     const potMax = Math.max(...c.conectores.map(x => x.potencia));
     return `
       <div class="charger-item" onclick="irA(${c.lat},${c.lng},${c.id})">
@@ -174,55 +253,78 @@ function renderLista(lista) {
           <strong>${c.nombre}</strong>
           <span>${c.direccion.split(',')[0]} · ${potMax} kW</span>
         </div>
-        <span class="badge ${badgeClass}" style="font-size:.7rem">${c.estado.replace('_',' ')}</span>
+        <span class="badge ${badge}" style="font-size:.7rem">${label}</span>
       </div>`;
   }).join('');
 }
 
+// ── Navegación al cargador ───────────────────────────────────
 function irA(lat, lng, id) {
   map.setView([lat, lng], 16);
   const c = cargadoresFiltrados.find(x => x.id === id);
   if (c) setTimeout(() => abrirPopup(c), 300);
 }
 
+function irAUTE(idx) {
+  const c = _uteFiltered[idx];
+  if (!c) return;
+  map.setView([c.lat, c.lng], 16);
+  setTimeout(() => abrirPopupUTE(c), 300);
+}
+
 // ── Filtros ──────────────────────────────────────────────────
 function aplicarFiltros() {
-  const tipos    = [...document.querySelectorAll('.f-tipo:checked')].map(i => i.value);
-  const estados  = [...document.querySelectorAll('.f-estado:checked')].map(i => i.value);
-  const accesos  = [...document.querySelectorAll('.f-acceso:checked')].map(i => i.value);
-  const potMin   = +document.getElementById('f-potencia').value;
-  const busqueda = document.getElementById('buscador').value.toLowerCase();
+  const tipos      = [...document.querySelectorAll('.f-tipo:checked')].map(i => i.value);
+  const estados    = [...document.querySelectorAll('.f-estado:checked')].map(i => i.value);
+  const accesos    = [...document.querySelectorAll('.f-acceso:checked')].map(i => i.value);
+  const potMin     = +document.getElementById('f-potencia').value;
+  const busqueda   = document.getElementById('buscador').value.toLowerCase().trim();
+  const mostrarUTE = document.getElementById('f-ute')?.checked ?? true;
 
+  // ── Filtrar cargadores E-Find ──────────────────────────────
   cargadoresFiltrados = getMock('cargadores').filter(c => {
     if (!estados.includes(c.estado)) return false;
     const esPublico = c.publica ? 'publico' : 'privado';
     if (!accesos.includes(esPublico)) return false;
-    const tipoOk = c.conectores.some(x => tipos.includes(x.tipo));
-    if (!tipoOk) return false;
-    const potOk  = c.conectores.some(x => x.potencia >= potMin);
-    if (!potOk) return false;
-    if (busqueda && !c.nombre.toLowerCase().includes(busqueda) && !c.direccion.toLowerCase().includes(busqueda)) return false;
+    if (!c.conectores.some(x => tipos.includes(x.tipo))) return false;
+    if (!c.conectores.some(x => x.potencia >= potMin))  return false;
+    if (busqueda && !c.nombre.toLowerCase().includes(busqueda)
+                 && !c.direccion.toLowerCase().includes(busqueda)) return false;
     return true;
   });
 
+  // ── Filtrar cargadores UTE ─────────────────────────────────
+  const uteFiltradas = (!mostrarUTE || !uteEstaciones.length) ? [] :
+    uteEstaciones.filter(c => {
+      if (!estados.includes(c.estado)) return false;
+      if (!c.conectores.some(x => tipos.includes(x.tipo))) return false;
+      if (!c.conectores.some(x => x.potencia >= potMin))  return false;
+      if (busqueda && !c.nombre.toLowerCase().includes(busqueda)
+                   && !c.direccion.toLowerCase().includes(busqueda)) return false;
+      return true;
+    });
+
   renderMarcadores(cargadoresFiltrados);
-  renderLista(cargadoresFiltrados);
+  renderMarcadoresUTE(uteFiltradas);
+  renderLista(cargadoresFiltrados, uteFiltradas);
 }
 
-// ── Popup detalle rápido ─────────────────────────────────────
+// ── Popup E-Find ─────────────────────────────────────────────
 function abrirPopup(c) {
-  const badgeClass = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' }[c.estado];
+  const badgeClass = _BADGE[c.estado] ?? 'badge-gray';
   const potMax   = Math.max(...c.conectores.map(x => x.potencia));
   const conTypes = [...new Set(c.conectores.map(x => x.tipo))].join(' · ');
   const precio   = c.costo_kwh ? `$${c.costo_kwh}/kWh` : 'Gratuito';
-  const colaInfo = c.cola > 0 ? `<span style="color:var(--warn);font-size:.8rem;display:inline-flex;align-items:center;gap:.25rem">${ICONS.clock(12)} ${c.cola} vehículo${c.cola>1?'s':''} en cola</span>` : '';
+  const colaInfo = c.cola > 0
+    ? `<span style="color:var(--warn);font-size:.8rem;display:inline-flex;align-items:center;gap:.25rem">${ICONS.clock(12)} ${c.cola} vehículo${c.cola>1?'s':''} en cola</span>`
+    : '';
   const u = Auth.get();
 
   document.getElementById('popup-content').innerHTML = `
     <button class="modal__close" onclick="cerrarPopup()">&times;</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
       <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${c.nombre}</h2>
-      <span class="badge ${badgeClass}">${c.estado.replace('_',' ')}</span>
+      <span class="badge ${badgeClass}">${_LABEL[c.estado] ?? c.estado}</span>
     </div>
     <p style="font-size:.82rem;color:var(--soft);margin-bottom:.65rem">${c.direccion}</p>
     ${colaInfo}
@@ -241,6 +343,49 @@ function abrirPopup(c) {
   document.getElementById('popup-overlay').style.display = 'flex';
 }
 
+// ── Popup UTE ────────────────────────────────────────────────
+function abrirPopupUTE(c) {
+  const badgeClass  = _BADGE[c.estado] ?? 'badge-gray';
+  const estadoLabel = _LABEL[c.estado] ?? c.estado;
+
+  const conectoresHtml = c.conectores.map(con => {
+    const cb = _BADGE[con.estado] ?? 'badge-gray';
+    const cl = _LABEL[con.estado] ?? con.estado;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:.3rem 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.82rem">
+          <strong>${con.cantidad}×</strong> ${con.tipo} · ${con.potencia} kW
+        </span>
+        <span class="badge ${cb}" style="font-size:.65rem">${cl}</span>
+      </div>`;
+  }).join('');
+
+  document.getElementById('popup-content').innerHTML = `
+    <button class="modal__close" onclick="cerrarPopup()">&times;</button>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
+      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">
+        ${c.nombre}
+        <span class="badge badge-ute" style="font-size:.62rem;vertical-align:middle;padding:.1rem .4rem">UTE</span>
+      </h2>
+      <span class="badge ${badgeClass}">${estadoLabel}</span>
+    </div>
+    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.2rem">${c.direccion}</p>
+    <p style="font-size:.78rem;color:var(--soft);margin-bottom:.75rem">${c.ciudad}, ${c.departamento}</p>
+    <div style="font-size:.78rem;font-weight:700;color:var(--soft);text-transform:uppercase;
+                letter-spacing:.05em;margin-bottom:.4rem">Conectores</div>
+    <div style="margin-bottom:.9rem">
+      ${conectoresHtml || '<p style="font-size:.82rem;color:var(--soft)">Sin información de conectores.</p>'}
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+      <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank"
+         class="btn btn--primary btn--sm">Cómo llegar</a>
+      <span style="font-size:.75rem;color:var(--soft)">Fuente: Red UTE · CargaME</span>
+    </div>
+  `;
+  document.getElementById('popup-overlay').style.display = 'flex';
+}
+
 function cerrarPopup() {
   document.getElementById('popup-overlay').style.display = 'none';
 }
@@ -249,30 +394,49 @@ function cerrarPopup() {
 const leyenda = L.control({ position: 'bottomright' });
 leyenda.onAdd = () => {
   const div = L.DomUtil.create('div', '');
-  div.style.cssText = 'background:white;padding:8px 10px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.8';
+  div.style.cssText = 'background:white;padding:8px 10px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.9';
   div.innerHTML = `
-    <strong style="display:block;margin-bottom:5px;color:#1A2E44;font-size:11px">Estado</strong>
+    <strong style="display:block;margin-bottom:4px;color:#1A2E44;font-size:11px">Estado</strong>
     <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#3BB273;flex-shrink:0"></span> Disponible</div>
     <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#E76F51;flex-shrink:0"></span> Ocupado</div>
     <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#9E9E9E;flex-shrink:0"></span> Sin servicio</div>
     <hr style="border:none;border-top:1px solid #E5E7EB;margin:5px 0">
-    <div style="color:#5C6B82;display:flex;align-items:center;gap:4px;font-size:10px">
-      <span style="color:#2D7DD2;display:inline-flex">${ICONS.bolt(12)}</span> Público &nbsp;·&nbsp;
-      <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#9E9E9E;flex-shrink:0"></span> Privado
+    <strong style="display:block;margin-bottom:4px;color:#1A2E44;font-size:11px">Fuente</strong>
+    <div style="color:#5C6B82;display:flex;align-items:center;gap:5px;font-size:10px">
+      <svg width="11" height="11" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#9E9E9E" stroke="#6B6B6B" stroke-width="2"/></svg> E-Find público
+    </div>
+    <div style="color:#5C6B82;display:flex;align-items:center;gap:5px;font-size:10px">
+      <svg width="11" height="11" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="#9E9E9E" stroke="#6B6B6B" stroke-width="2"/></svg> E-Find privado
+    </div>
+    <div style="color:#5C6B82;display:flex;align-items:center;gap:5px;font-size:10px">
+      <svg width="11" height="11" viewBox="0 0 26 26"><g transform="translate(13,13) rotate(45)"><rect x="-7" y="-7" width="14" height="14" rx="2" fill="#9E9E9E" stroke="#1B4F9C" stroke-width="2"/></g></svg> Red UTE
     </div>
   `;
   return div;
 };
 leyenda.addTo(map);
 
+// ── Carga inicial de datos UTE ────────────────────────────────
+async function cargarUTE() {
+  try {
+    uteEstaciones = await UTEService.fetchEstaciones();
+    console.info(`UTEService: ${uteEstaciones.length} estaciones cargadas.`);
+    aplicarFiltros();  // Re-renderizar con datos UTE
+  } catch (err) {
+    console.warn('UTEService: no se pudieron cargar los cargadores UTE.', err.message);
+  }
+}
+
 // ── Eventos ──────────────────────────────────────────────────
 document.getElementById('btn-filtrar').addEventListener('click', aplicarFiltros);
 document.getElementById('buscador').addEventListener('input', aplicarFiltros);
 document.querySelectorAll('.f-tipo,.f-estado,.f-acceso').forEach(el => el.addEventListener('change', aplicarFiltros));
 document.getElementById('f-potencia').addEventListener('change', aplicarFiltros);
+document.getElementById('f-ute').addEventListener('change', aplicarFiltros);
 
 // ── Arranque ─────────────────────────────────────────────────
-aplicarFiltros();
+aplicarFiltros();   // Renderiza E-Find inmediatamente
+cargarUTE();        // Carga UTE en paralelo (async, no bloqueante)
 </script>
 </body>
 </html>
