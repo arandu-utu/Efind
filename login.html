@@ -35,11 +35,8 @@
       <li>Alquilá tu cargador y generá ingresos</li>
     </ul>
     <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,.07);border-radius:10px">
-      <p style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:.5rem">Usuarios de prueba:</p>
-      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">admin@efind.com.uy · <em>Admin</em></p>
-      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">carlos@gmail.com · <em>Particular</em></p>
-      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">sofia@empresa.com.uy · <em>Empresa</em></p>
-      <p style="font-size:.8rem;color:rgba(255,255,255,.4);margin-top:.35rem">(cualquier contraseña)</p>
+      <p style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:.5rem">Usuario de prueba:</p>
+      <p style="font-size:.82rem;color:rgba(255,255,255,.75)">admin@efind.uy · <em>Admin</em></p>
     </div>
     <div style="margin-top:auto;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:.6rem">
       <span style="font-size:.75rem;color:rgba(255,255,255,.4)">Desarrollado por</span>
@@ -141,38 +138,28 @@ document.getElementById('login-form').addEventListener('submit', e => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Ingresando…';
 
-  // Autenticación con la API real
   fetch('/api/login.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password: pwd }),
   })
-  .then(r => {
-    console.log('[login] HTTP status:', r.status, r.headers.get('content-type'));
-    return r.json();
-  })
+  .then(r => r.json())
   .then(json => {
-    console.log('[login] JSON recibido:', JSON.stringify(json));
     if (json.ok) {
-      console.log('[login] ok=true, data:', json.data);
       localStorage.setItem(Auth.KEY, JSON.stringify(json.data));
-      console.log('[login] localStorage[', Auth.KEY, '] =', localStorage.getItem(Auth.KEY));
       mostrarAlert('✓ Sesión iniciada. Redirigiendo…', 'success');
       setTimeout(() => {
         const dest = sessionStorage.getItem('redirect_after_login') || 'index.html';
         sessionStorage.removeItem('redirect_after_login');
-        console.log('[login] Redirigiendo a:', dest);
         location.href = dest;
       }, 700);
     } else {
-      console.warn('[login] ok=false:', json.error);
       mostrarAlert('✗ ' + (json.error || 'Credenciales incorrectas'));
       btn.disabled = false;
       btn.textContent = 'Iniciar sesión';
     }
   })
-  .catch(err => {
-    console.error('[login] Error de fetch/parse:', err);
+  .catch(() => {
     mostrarAlert('✗ Error de conexión con el servidor');
     btn.disabled = false;
     btn.textContent = 'Iniciar sesión';
