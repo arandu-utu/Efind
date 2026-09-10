@@ -147,7 +147,7 @@ requireAuth();
 let pasoActual = 0;
 let marker = null;
 let latSel = null, lngSel = null;
-let conectores = [{ tipo:'Tipo 2', potencia:7.4 }];
+let conectores = [{ tipo:'Type 2', potencia:7.4 }];
 
 /* Inicializar mapa en paso 1 */
 const mapa = L.map('mapa-nuevo').setView([-34.9058, -56.1652], 13);
@@ -197,7 +197,7 @@ function renderConectores() {
   lista.innerHTML = conectores.map((c,i) => `
     <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
       <select class="form-select" style="flex:1;font-size:.85rem" onchange="conectores[${i}].tipo=this.value">
-        ${['Tipo 2','CCS2','CHAdeMO','Schuko'].map(t=>
+        ${['Type 2','CCS2','CHAdeMO','Schuko','GB/T AC','GB/T DC'].map(t=>
           `<option ${t===c.tipo?'selected':''}>${t}</option>`).join('')}
       </select>
       <input type="number" class="form-input" value="${c.potencia}"
@@ -207,7 +207,7 @@ function renderConectores() {
       ${conectores.length>1 ? `<button class="btn btn--ghost btn--sm" onclick="quitarConector(${i})">${ICONS.x(14)}</button>` : ''}
     </div>`).join('');
 }
-function agregarConector() { conectores.push({tipo:'Tipo 2',potencia:7.4}); renderConectores(); }
+function agregarConector() { conectores.push({tipo:'Type 2',potencia:7.4}); renderConectores(); }
 function quitarConector(i) { conectores.splice(i,1); renderConectores(); }
 
 /* Stepper */
@@ -265,33 +265,49 @@ function renderResumen() {
     </table>`;
 }
 
+function mostrarErrorGuardar(msg) {
+  const el = document.getElementById('alert-agregar');
+  el.className = 'alert alert-error';
+  el.textContent = msg;
+  el.style.display = 'flex';
+}
+
 function guardar() {
   const btn = document.querySelector('[onclick="guardar()"]');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Guardando…';
 
-  setTimeout(() => {
-    const u = Auth.get();
-    const lista = getMock('cargadores');
-    const nuevo = {
-      id: Date.now(),
-      nombre:  document.getElementById('nombre-c').value,
-      lat:     +latSel, lng: +lngSel,
-      direccion: document.getElementById('dir-final').value,
-      estado:  'disponible',
-      horario: document.getElementById('horario-c').value || '24 horas',
-      costo_kwh: +document.getElementById('costo-c').value || 0,
-      publica: document.querySelector('input[name="acceso"]:checked').value === 'publico',
-      conectores: conectores.map(c=>({...c})),
-      resenas: [], cola: 0,
-      propietario_id: u.id,
-    };
-    lista.push(nuevo);
-    setMock('cargadores', lista);
+  const payload = {
+    nombre:     document.getElementById('nombre-c').value,
+    direccion:  document.getElementById('dir-final').value,
+    lat:        +latSel, lng: +lngSel,
+    horario:    document.getElementById('horario-c').value || '24 horas',
+    costo_kwh:  +document.getElementById('costo-c').value || 0,
+    acceso:     document.querySelector('input[name="acceso"]:checked').value,
+    conectores: conectores.map(c => ({...c})),
+  };
 
-    document.getElementById('panel-3').style.display = 'none';
-    document.getElementById('panel-exito').style.display = '';
-  }, 900);
+  fetch('/api/cargadores.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(json => {
+    if (json.ok) {
+      document.getElementById('panel-3').style.display = 'none';
+      document.getElementById('panel-exito').style.display = '';
+    } else {
+      mostrarErrorGuardar('✗ ' + (json.error || 'No se pudo guardar el cargador.'));
+      btn.disabled = false;
+      btn.innerHTML = '<span data-icon="checkCircle" data-size="16"></span> Guardar cargador';
+    }
+  })
+  .catch(() => {
+    mostrarErrorGuardar('✗ Error de conexión con el servidor.');
+    btn.disabled = false;
+    btn.innerHTML = '<span data-icon="checkCircle" data-size="16"></span> Guardar cargador';
+  });
 }
 </script>
 <script>
