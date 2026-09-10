@@ -46,11 +46,12 @@
         <!-- Filtros -->
         <div class="filter-section">
           <div class="filter-title">Tipo de conector</div>
-          <label class="check-row"><input type="checkbox" class="f-tipo" value="Tipo 2"   checked> Tipo 2</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="Type 2"   checked> Type 2</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="CCS2"     checked> CCS2</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="CHAdeMO"  checked> CHAdeMO</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="Schuko"   checked> Schuko</label>
-          <label class="check-row"><input type="checkbox" class="f-tipo" value="GB/T"     checked> GB/T</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="GB/T AC"  checked> GB/T AC</label>
+          <label class="check-row"><input type="checkbox" class="f-tipo" value="GB/T DC"  checked> GB/T DC</label>
         </div>
 
         <div class="filter-section">
@@ -111,7 +112,6 @@
 <script src="js/icons.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/estimador.js"></script>
-<script src="js/ute-service.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════
    MAPA PRINCIPAL
@@ -178,49 +178,33 @@ function renderMarcadores(lista) {
   marcadores.forEach(m => map.removeLayer(m));
   marcadores = [];
   lista.forEach(c => {
-    const m = L.marker([c.lat, c.lng], { icon: crearIcono(c.estado, c.publica) })
+    const icono = c.fuente === 'ute'
+      ? crearIconoUTE(c.estado)
+      : crearIcono(c.estado, c.acceso === 'publico');
+    const m = L.marker([c.lat, c.lng], { icon: icono })
       .addTo(map)
       .on('click', () => abrirPopup(c));
     marcadores.push(m);
   });
 }
 
-// ── Estado UTE ───────────────────────────────────────────────
-let uteEstaciones = [];    // Cache de estaciones UTE (cargado al inicio)
-let uteMarkers    = [];    // Marcadores Leaflet activos de UTE
-let _uteFiltered  = [];    // Estaciones UTE del último filtrado (para irAUTE)
+// ── Datos ───────────────────────────────────────────────────
+let todasEstaciones = [];  // Todo lo que devuelve /api/estaciones.php (E-Find + UTE)
 
-function renderMarcadoresUTE(lista) {
-  uteMarkers.forEach(m => map.removeLayer(m));
-  uteMarkers = [];
-  lista.forEach(c => {
-    const m = L.marker([c.lat, c.lng], { icon: crearIconoUTE(c.estado) })
-      .addTo(map)
-      .on('click', () => abrirPopupUTE(c));
-    uteMarkers.push(m);
-  });
-}
-
-// ── Lista lateral (E-Find + UTE mezclados) ───────────────────
+// ── Lista lateral ──────────────────────────────────────────
 const _BADGE = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' };
 const _LABEL = { disponible: 'Disponible',  ocupado: 'Ocupado',      sin_servicio: 'Sin servicio' };
 
-function renderLista(efindLista, uteLista) {
+function renderLista(lista) {
   const el = document.getElementById('charger-list');
 
-  // Guardar referencia de UTE para irAUTE()
-  _uteFiltered = uteLista;
-
-  // Combinar ambas fuentes y ordenar: disponible → ocupado → sin_servicio
   const PESO = { disponible: 0, ocupado: 1, sin_servicio: 2 };
-  const efind = efindLista.map(c => ({ ...c, _src: 'efind' }));
-  const ute   = uteLista.map((c, i) => ({ ...c, _src: 'ute', _idx: i }));
-  const todos = [...efind, ...ute].sort((a, b) => {
+  const ordenada = [...lista].sort((a, b) => {
     const d = (PESO[a.estado] ?? 3) - (PESO[b.estado] ?? 3);
     return d !== 0 ? d : a.nombre.localeCompare(b.nombre);
   });
 
-  if (!todos.length) {
+  if (!ordenada.length) {
     el.innerHTML = `<div class="empty-state" style="padding:2rem 1rem">
       <div class="empty-state__icon">${ICONS.bolt(40)}</div>
       <div class="empty-state__title">Sin cargadores</div>
@@ -229,29 +213,18 @@ function renderLista(efindLista, uteLista) {
     return;
   }
 
-  el.innerHTML = todos.map(c => {
-    const badge = _BADGE[c.estado] ?? 'badge-gray';
-    const label = _LABEL[c.estado] ?? c.estado;
-
-    if (c._src === 'ute') {
-      return `
-        <div class="charger-item" onclick="irAUTE(${c._idx})">
-          <div class="charger-item__info">
-            <strong>${c.nombre}
-              <span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem;vertical-align:middle">UTE</span>
-            </strong>
-            <span>${c.direccion.split(',')[0]} · ${c.potenciaMax} kW</span>
-          </div>
-          <span class="badge ${badge}" style="font-size:.7rem">${label}</span>
-        </div>`;
-    }
-
-    const potMax = Math.max(...c.conectores.map(x => x.potencia));
+  el.innerHTML = ordenada.map(c => {
+    const badge  = _BADGE[c.estado] ?? 'badge-gray';
+    const label  = _LABEL[c.estado] ?? c.estado;
+    const potMax = c.conectores.length ? Math.max(...c.conectores.map(x => x.potencia)) : 0;
+    const uteTag = c.fuente === 'ute'
+      ? `<span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem;vertical-align:middle">UTE</span>`
+      : '';
     return `
       <div class="charger-item" onclick="irA(${c.lat},${c.lng},${c.id})">
         <div class="charger-item__info">
-          <strong>${c.nombre}</strong>
-          <span>${c.direccion.split(',')[0]} · ${potMax} kW</span>
+          <strong>${c.nombre} ${uteTag}</strong>
+          <span>${(c.direccion || '').split(',')[0]} · ${potMax} kW</span>
         </div>
         <span class="badge ${badge}" style="font-size:.7rem">${label}</span>
       </div>`;
@@ -265,13 +238,6 @@ function irA(lat, lng, id) {
   if (c) setTimeout(() => abrirPopup(c), 300);
 }
 
-function irAUTE(idx) {
-  const c = _uteFiltered[idx];
-  if (!c) return;
-  map.setView([c.lat, c.lng], 16);
-  setTimeout(() => abrirPopupUTE(c), 300);
-}
-
 // ── Filtros ──────────────────────────────────────────────────
 function aplicarFiltros() {
   const tipos      = [...document.querySelectorAll('.f-tipo:checked')].map(i => i.value);
@@ -281,106 +247,55 @@ function aplicarFiltros() {
   const busqueda   = document.getElementById('buscador').value.toLowerCase().trim();
   const mostrarUTE = document.getElementById('f-ute')?.checked ?? true;
 
-  // ── Filtrar cargadores E-Find ──────────────────────────────
-  cargadoresFiltrados = getMock('cargadores').filter(c => {
+  cargadoresFiltrados = todasEstaciones.filter(c => {
+    if (c.fuente === 'ute' && !mostrarUTE) return false;
     if (!estados.includes(c.estado)) return false;
-    const esPublico = c.publica ? 'publico' : 'privado';
-    if (!accesos.includes(esPublico)) return false;
+    if (!accesos.includes(c.acceso)) return false;
     if (!c.conectores.some(x => tipos.includes(x.tipo))) return false;
     if (!c.conectores.some(x => x.potencia >= potMin))  return false;
     if (busqueda && !c.nombre.toLowerCase().includes(busqueda)
-                 && !c.direccion.toLowerCase().includes(busqueda)) return false;
+                 && !(c.direccion || '').toLowerCase().includes(busqueda)) return false;
     return true;
   });
 
-  // ── Filtrar cargadores UTE ─────────────────────────────────
-  const uteFiltradas = (!mostrarUTE || !uteEstaciones.length) ? [] :
-    uteEstaciones.filter(c => {
-      if (!estados.includes(c.estado)) return false;
-      if (!c.conectores.some(x => tipos.includes(x.tipo))) return false;
-      if (!c.conectores.some(x => x.potencia >= potMin))  return false;
-      if (busqueda && !c.nombre.toLowerCase().includes(busqueda)
-                   && !c.direccion.toLowerCase().includes(busqueda)) return false;
-      return true;
-    });
-
   renderMarcadores(cargadoresFiltrados);
-  renderMarcadoresUTE(uteFiltradas);
-  renderLista(cargadoresFiltrados, uteFiltradas);
+  renderLista(cargadoresFiltrados);
 }
 
-// ── Popup E-Find ─────────────────────────────────────────────
+// ── Popup ──────────────────────────────────────────────────
 function abrirPopup(c) {
+  const esUte      = c.fuente === 'ute';
   const badgeClass = _BADGE[c.estado] ?? 'badge-gray';
-  const potMax   = Math.max(...c.conectores.map(x => x.potencia));
-  const conTypes = [...new Set(c.conectores.map(x => x.tipo))].join(' · ');
-  const precio   = c.costo_kwh ? `$${c.costo_kwh}/kWh` : 'Gratuito';
-  const colaInfo = c.cola > 0
-    ? `<span style="color:var(--warn);font-size:.8rem;display:inline-flex;align-items:center;gap:.25rem">${ICONS.clock(12)} ${c.cola} vehículo${c.cola>1?'s':''} en cola</span>`
+  const potMax     = c.conectores.length ? Math.max(...c.conectores.map(x => x.potencia)) : 0;
+  const conTypes   = [...new Set(c.conectores.map(x => x.tipo))].join(' · ') || 'Sin datos';
+  const precio     = c.costo_kwh ? `$${c.costo_kwh}/kWh` : 'Gratuito';
+  const horario    = c.horario || 'No especificado';
+  const uteTag     = esUte
+    ? `<span class="badge badge-ute" style="font-size:.62rem;vertical-align:middle;padding:.1rem .4rem">UTE</span>`
+    : '';
+  const fuenteInfo = esUte
+    ? `<p style="font-size:.75rem;color:var(--soft);margin-top:.4rem">Fuente: Red UTE · CargaME</p>`
     : '';
   const u = Auth.get();
 
   document.getElementById('popup-content').innerHTML = `
     <button class="modal__close" onclick="cerrarPopup()">&times;</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
-      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${c.nombre}</h2>
+      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${c.nombre} ${uteTag}</h2>
       <span class="badge ${badgeClass}">${_LABEL[c.estado] ?? c.estado}</span>
     </div>
-    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.65rem">${c.direccion}</p>
-    ${colaInfo}
+    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.65rem">${c.direccion || ''}</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .6rem;font-size:.82rem;margin:.65rem 0">
       <div><span style="color:var(--soft)">Potencia:</span> <strong>${potMax} kW</strong></div>
       <div><span style="color:var(--soft)">Conectores:</span> <strong>${conTypes}</strong></div>
-      <div><span style="color:var(--soft)">Horario:</span> <strong>${c.horario}</strong></div>
+      <div><span style="color:var(--soft)">Horario:</span> <strong>${horario}</strong></div>
       <div><span style="color:var(--soft)">Precio:</span> <strong>${precio}</strong></div>
     </div>
+    ${fuenteInfo}
     <div style="display:flex;gap:.5rem;margin-top:.9rem;flex-wrap:wrap">
       <a href="cargador.html?id=${c.id}" class="btn btn--primary btn--sm">Ver detalle</a>
       <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" class="btn btn--outline btn--sm">Cómo llegar</a>
-      ${u ? `<a href="reportar.html?id=${c.id}" class="btn btn--ghost btn--sm">Reportar</a>` : ''}
-    </div>
-  `;
-  document.getElementById('popup-overlay').style.display = 'flex';
-}
-
-// ── Popup UTE ────────────────────────────────────────────────
-function abrirPopupUTE(c) {
-  const badgeClass  = _BADGE[c.estado] ?? 'badge-gray';
-  const estadoLabel = _LABEL[c.estado] ?? c.estado;
-
-  const conectoresHtml = c.conectores.map(con => {
-    const cb = _BADGE[con.estado] ?? 'badge-gray';
-    const cl = _LABEL[con.estado] ?? con.estado;
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;
-                  padding:.3rem 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:.82rem">
-          <strong>${con.cantidad}×</strong> ${con.tipo} · ${con.potencia} kW
-        </span>
-        <span class="badge ${cb}" style="font-size:.65rem">${cl}</span>
-      </div>`;
-  }).join('');
-
-  document.getElementById('popup-content').innerHTML = `
-    <button class="modal__close" onclick="cerrarPopup()">&times;</button>
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
-      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">
-        ${c.nombre}
-        <span class="badge badge-ute" style="font-size:.62rem;vertical-align:middle;padding:.1rem .4rem">UTE</span>
-      </h2>
-      <span class="badge ${badgeClass}">${estadoLabel}</span>
-    </div>
-    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.2rem">${c.direccion}</p>
-    <p style="font-size:.78rem;color:var(--soft);margin-bottom:.75rem">${c.ciudad}, ${c.departamento}</p>
-    <div style="font-size:.78rem;font-weight:700;color:var(--soft);text-transform:uppercase;
-                letter-spacing:.05em;margin-bottom:.4rem">Conectores</div>
-    <div style="margin-bottom:.9rem">
-      ${conectoresHtml || '<p style="font-size:.82rem;color:var(--soft)">Sin información de conectores.</p>'}
-    </div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-      <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank"
-         class="btn btn--primary btn--sm">Cómo llegar</a>
-      <span style="font-size:.75rem;color:var(--soft)">Fuente: Red UTE · CargaME</span>
+      ${u && !esUte ? `<a href="reportar.html?id=${c.id}" class="btn btn--ghost btn--sm">Reportar</a>` : ''}
     </div>
   `;
   document.getElementById('popup-overlay').style.display = 'flex';
@@ -416,15 +331,21 @@ leyenda.onAdd = () => {
 };
 leyenda.addTo(map);
 
-// ── Carga inicial de datos UTE ────────────────────────────────
-async function cargarUTE() {
+// ── Carga inicial de datos (E-Find + UTE sincronizadas, una sola API) ──
+async function cargarEstaciones() {
   try {
-    uteEstaciones = await UTEService.fetchEstaciones();
-    console.info(`UTEService: ${uteEstaciones.length} estaciones cargadas.`);
-    aplicarFiltros();  // Re-renderizar con datos UTE
+    const res  = await fetch('/api/estaciones.php');
+    const json = await res.json();
+    if (json.ok) {
+      todasEstaciones = json.data;
+      console.info(`EfindAPI: ${todasEstaciones.length} estaciones cargadas.`);
+    } else {
+      console.warn('EfindAPI: error al cargar estaciones.', json.error);
+    }
   } catch (err) {
-    console.warn('UTEService: no se pudieron cargar los cargadores UTE.', err.message);
+    console.warn('EfindAPI: no se pudo conectar con el servidor.', err.message);
   }
+  aplicarFiltros();
 }
 
 // ── Eventos ──────────────────────────────────────────────────
@@ -435,8 +356,7 @@ document.getElementById('f-potencia').addEventListener('change', aplicarFiltros)
 document.getElementById('f-ute').addEventListener('change', aplicarFiltros);
 
 // ── Arranque ─────────────────────────────────────────────────
-aplicarFiltros();   // Renderiza E-Find inmediatamente
-cargarUTE();        // Carga UTE en paralelo (async, no bloqueante)
+cargarEstaciones();
 </script>
 </body>
 </html>

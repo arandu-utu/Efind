@@ -27,8 +27,22 @@ try {
 
     $method = $_SERVER['REQUEST_METHOD'];
 
-    /* ── GET: listar pendientes (admin) ──────────────────────── */
+    /* ── GET: reseñas aprobadas de un cargador puntual (público) ──
+           o lista de pendientes (admin) si no se pasa punto_carga_id ── */
     if ($method === 'GET') {
+        if (isset($_GET['punto_carga_id'])) {
+            $pcid = (int)$_GET['punto_carga_id'];
+            $stmt = $db->prepare("
+                SELECT id, usuario_nombre, estrellas, texto, fecha_creacion
+                FROM   resenas
+                WHERE  punto_carga_id = :pcid AND estado = 'aprobada'
+                ORDER  BY fecha_creacion DESC
+            ");
+            $stmt->execute([':pcid' => $pcid]);
+            echo json_encode(['ok' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+            exit;
+        }
+
         requiere_rol(1);
         $stmt = $db->query("
             SELECT r.*, p.nombre AS cargador_nombre

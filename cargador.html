@@ -75,11 +75,10 @@
     <div class="form-group" style="margin-bottom:.8rem">
       <label class="form-label">Tipo de problema</label>
       <select id="tipo-reporte" class="form-select">
-        <option>Fuera de servicio</option>
-        <option>Conector dañado</option>
-        <option>Precio incorrecto</option>
-        <option>Acceso bloqueado</option>
-        <option>Otro</option>
+        <option value="fuera_servicio">Fuera de servicio</option>
+        <option value="vandalismo">Vandalismo</option>
+        <option value="informacion_incorrecta">Información incorrecta (precio, conector, acceso)</option>
+        <option value="otro">Otro</option>
       </select>
     </div>
     <div class="form-group" style="margin-bottom:.8rem">
@@ -124,19 +123,20 @@ let C = null;   // se rellena con datos de la API
       acceso:        e.acceso,
       publica:       e.acceso === 'publico',
       fuente:        e.fuente || 'efind',
-      direccion:     e.nombre,          // sin dirección detallada aún
-      horario:       '24/7',            // sin horario en BD aún
-      costo_kwh:     null,              // sin precio en BD aún
-      cola:          0,
-      propietario_id: null,
+      direccion:     e.direccion || 'Sin dirección registrada',
+      horario:       e.horario || 'No especificado',
+      costo_kwh:     +e.costo_kwh || 0,
+      cola:          +e.cola || 0,
+      propietario_id: e.propietario_id,
       // Conectores: [{tipo, potencia}]
       conectores: (e.conectores || []).map(c => ({
         tipo:     c.tipo,
         potencia: parseFloat(c.potencia_kw),
       })),
-      resenas: [],  // módulo de reseñas en próxima entrega
+      resenas: [],  // se completa en cargarResenas()
     };
 
+    await cargarResenas();
     renderPage();
 
   } catch (err) {
@@ -144,6 +144,21 @@ let C = null;   // se rellena con datos de la API
     mostrarError('Error de conexión con el servidor.');
   }
 })();
+
+async function cargarResenas() {
+  try {
+    const res  = await fetch(`/api/resenas.php?punto_carga_id=${ID}`);
+    const json = await res.json();
+    if (json.ok) {
+      C.resenas = json.data.map(r => ({
+        usuario:   r.usuario_nombre,
+        estrellas: +r.estrellas,
+        texto:     r.texto,
+        fecha:     r.fecha_creacion,
+      }));
+    }
+  } catch (err) { /* si falla, queda la lista vacía */ }
+}
 
 function mostrarError(msg) {
   document.getElementById('page-content').innerHTML = `
@@ -351,7 +366,7 @@ function setStar(n) {
   });
 }
 
-function enviarResena() {
+async function enviarResena() {
   if (!estrellasSel) {
     const al = document.getElementById('resena-alert');
     al.className = 'alert alert-warn';
@@ -359,9 +374,27 @@ function enviarResena() {
     al.style.display = 'flex';
     return;
   }
-  // TODO: POST a /api/resenas.php (próxima entrega)
-  cerrarResena();
-  mostrarFeedback('crowd-feedback', '✓ Reseña recibida, gracias! (Se publicará cuando el módulo esté completo.)', 'success');
+  try {
+    const res = await fetch('/api/resenas.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        punto_carga_id: C.id,
+        estrellas: estrellasSel,
+        texto: document.getElementById('txt-resena').value || '',
+      }),
+    });
+    const json = await res.json();
+    cerrarResena();
+    if (json.ok) {
+      mostrarFeedback('crowd-feedback', '✓ Reseña enviada. Se va a publicar cuando un admin la apruebe.', 'success');
+    } else {
+      mostrarFeedback('crowd-feedback', json.error || 'Error al enviar la reseña.', 'warn');
+    }
+  } catch {
+    cerrarResena();
+    mostrarFeedback('crowd-feedback', 'Error de conexión al enviar la reseña.', 'warn');
+  }
 }
 
 /* ── Modal reporte ─────────────────────────────────────────── */
@@ -394,16 +427,49 @@ async function enviarReporte() {
   }
 }
 
-/* ── Crowdsourcing (TODO: conectar a /api/crowdsource.php en próxima entrega) */
-function reportarEstado(estado) {
-  // Actualización local mientras se desarrolla el módulo de crowdsourcing
-  C.estado = estado;
-  mostrarFeedback('crowd-feedback', `✓ Estado actualizado a "${estado.replace('_',' ')}".`, 'success');
+/* ── Crowdsourcing: se envían como reportes, igual que "Reportar problema".
+     Un admin los revisa y resuelve desde el panel (no se sobreescribe el
+     estado directo, para mantener la moderación existente). ── */
+async function reportarEstado(estado) {
+  const labels = { disponible: 'Disponible', ocupado: 'Ocupado', sin_servicio: 'Fuera de servicio' };
+  try {
+    const res = await fetch('/api/estado.php', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ punto_carga_id: C.id, estado }),
+    });
+    const json = await res.json();
+    if (json.ok) {
+      C.estado = estado;
+      renderPage();  // refresca el badge de estado en el acto
+      mostrarFeedback('crowd-feedback', `✓ Estado actualizado a "${labels[estado] || estado}".`, 'success');
+    } else {
+      mostrarFeedback('crowd-feedback', json.error || 'Error al actualizar el estado.', 'warn');
+    }
+  } catch {
+    mostrarFeedback('crowd-feedback', 'Error de conexión al actualizar el estado.', 'warn');
+  }
 }
-function reportarCola() {
+
+async function reportarCola() {
   const cola = +document.getElementById('sel-cola').value;
-  C.cola = cola;
-  mostrarFeedback('crowd-feedback', `✓ Cola actualizada a ${cola} vehículo${cola!==1?'s':''}.`, 'success');
+  try {
+    const res = await fetch('/api/cola.php', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ punto_carga_id: C.id, cola }),
+    });
+    const json = await res.json();
+    if (json.ok) {
+      C.cola = cola;
+      renderPage();  // refresca "Sin espera" / "N vehículos en cola" en el acto
+      mostrarFeedback('crowd-feedback', `✓ Cola actualizada a ${cola} vehículo${cola!==1?'s':''}.`, 'success');
+    } else {
+      mostrarFeedback('crowd-feedback', json.error || 'Error al actualizar la cola.', 'warn');
+    }
+  } catch {
+    mostrarFeedback('crowd-feedback', 'Error de conexión al actualizar la cola.', 'warn');
+  }
 }
 
 function mostrarFeedback(elId, msg, tipo) {

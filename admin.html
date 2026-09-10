@@ -72,7 +72,13 @@
 
     <!-- Últimos cargadores -->
     <div class="card" id="cargadores" style="margin-top:1.25rem">
-      <div class="card__title"><span data-icon="bolt" data-size="16"></span> Últimos cargadores registrados</div>
+      <div class="card__title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <span><span data-icon="bolt" data-size="16"></span> Últimos cargadores registrados</span>
+        <div style="display:flex;align-items:center;gap:.6rem">
+          <span id="sync-ute-estado" style="font-size:.78rem"></span>
+          <button id="btn-sync-ute" class="btn btn--outline btn--sm" onclick="sincronizarUTE()">Actualizar cargadores UTE</button>
+        </div>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead><tr><th>Nombre</th><th>Dirección</th><th>Estado</th><th>Conectores</th><th></th></tr></thead>
@@ -210,25 +216,61 @@ async function modResena(id, estado) {
 }
 
 /* ── Reportes abiertos ──────────────────────────────────────── */
+const tipoReporteLabel = {
+  fuera_servicio: 'Fuera de servicio',
+  vandalismo: 'Vandalismo',
+  informacion_incorrecta: 'Información incorrecta',
+  otro: 'Otro',
+};
 function renderReportes() {
   const pend = reportes.filter(r => !+r.resuelto);
   const el   = document.getElementById('lista-reportes');
   el.innerHTML = pend.length ? `
     <div class="table-wrap"><table class="data-table">
-      <thead><tr><th>Cargador</th><th>Tipo</th><th>Descripción</th><th>Reportado por</th><th>Fecha</th><th>Acción</th></tr></thead>
-      <tbody>${pend.map(r=>`<tr>
-        <td><a href="cargador.html?id=${r.punto_carga_id}">${r.punto_carga_nombre || 'Cargador #'+r.punto_carga_id}</a></td>
-        <td>${r.tipo}</td>
+      <thead><tr><th>Cargador</th><th>Tipo</th><th>Descripción</th><th>Reportado por</th><th>Fecha</th><th>Aplicar estado</th><th>Acción</th></tr></thead>
+      <tbody>${pend.map(r=>{
+        const huerfano = !r.punto_carga_nombre;
+        return `<tr>
+        <td>${huerfano
+            ? `<span style="color:var(--soft)" title="El cargador ya no existe en la base">Cargador #${r.punto_carga_id} (eliminado)</span>`
+            : `<a href="cargador.html?id=${r.punto_carga_id}">${r.punto_carga_nombre}</a>`}</td>
+        <td>${tipoReporteLabel[r.tipo] || r.tipo}</td>
         <td style="font-size:.82rem">${r.descripcion || '—'}</td>
         <td>${r.usuario_nombre || '—'}</td>
         <td>${r.creado_en ? r.creado_en.slice(0,10) : ''}</td>
-        <td><button class="btn btn--green btn--sm" onclick="resolverReporte(${r.id})">Resolver</button></td>
-      </tr>`).join('')}</tbody>
+        <td>
+          ${huerfano ? '—' : `
+          <select id="estado-sel-${r.id}" class="form-select" style="font-size:.8rem;padding:.2rem .4rem">
+            <option value="">No cambiar</option>
+            <option value="disponible">Disponible</option>
+            <option value="ocupado">Ocupado</option>
+            <option value="sin_servicio">Fuera de servicio</option>
+          </select>`}
+        </td>
+        <td><button class="btn btn--green btn--sm" onclick="resolverReporte(${r.id}, ${r.punto_carga_id})">Resolver</button></td>
+      </tr>`;
+      }).join('')}</tbody>
     </table></div>`
     : '<p style="font-size:.88rem;color:var(--soft)">Sin reportes pendientes. ✓</p>';
 }
 
-async function resolverReporte(id) {
+async function resolverReporte(id, puntoCargaId) {
+  const sel = document.getElementById(`estado-sel-${id}`);
+  const nuevoEstado = sel ? sel.value : '';
+
+  // Si el admin eligió un estado, aplicarlo al cargador primero
+  if (nuevoEstado) {
+    const rEstado = await fetch('/api/estado.php', {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ punto_carga_id: puntoCargaId, estado: nuevoEstado }),
+    }).then(r => r.json());
+    if (!rEstado.ok) {
+      alert('No se pudo actualizar el estado del cargador: ' + (rEstado.error || ''));
+      return;
+    }
+  }
+
   const res = await fetch('/api/reportes.php', {
     method: 'PATCH',
     headers: {'Content-Type': 'application/json'},
@@ -244,13 +286,45 @@ async function resolverReporte(id) {
 /* ── Últimos cargadores ─────────────────────────────────────── */
 const badgeMap = { disponible:'badge-green', ocupado:'badge-orange', sin_servicio:'badge-gray' };
 function renderCargadores(lista) {
-  document.getElementById('tbody-cargadores').innerHTML = lista.map(c=>`<tr>
-    <td><a href="cargador.html?id=${c.id}">${c.nombre}</a></td>
+  document.getElementById('tbody-cargadores').innerHTML = lista.map(c=>{
+    const tipos = [...new Set((c.conectores||[]).map(x=>x.tipo))].join(', ') || '—';
+    return `<tr>
+    <td><a href="cargador.html?id=${c.id}">${c.nombre}</a> ${c.fuente==='ute' ? '<span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem">UTE</span>' : ''}</td>
     <td style="font-size:.82rem;color:var(--soft)">${c.acceso || ''}</td>
     <td><span class="badge ${badgeMap[c.estado]||''}">${c.estado}</span></td>
-    <td style="font-size:.82rem">${c.tipos_conectores || '—'}</td>
+    <td style="font-size:.82rem">${tipos}</td>
     <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
+}
+
+/* ── Sincronización manual de cargadores UTE ─────────────────── */
+async function sincronizarUTE() {
+  const btn = document.getElementById('btn-sync-ute');
+  const estadoEl = document.getElementById('sync-ute-estado');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sincronizando…';
+  estadoEl.textContent = '';
+
+  try {
+    const res  = await fetch('/api/ute-sync.php', { method: 'POST' });
+    const json = await res.json();
+    if (json.ok) {
+      const d = json.data;
+      estadoEl.textContent = `✓ ${d.creados} nuevas, ${d.actualizados} actualizadas (de ${d.total_ute} en UTE).`;
+      estadoEl.style.color = 'var(--success, #2A8F59)';
+      initDashboard(); // refrescar la tabla de "últimos cargadores"
+    } else {
+      estadoEl.textContent = '✗ ' + (json.error || 'Error al sincronizar.');
+      estadoEl.style.color = 'var(--warn, #C4532A)';
+    }
+  } catch (err) {
+    estadoEl.textContent = '✗ Error de conexión con el servidor.';
+    estadoEl.style.color = 'var(--warn, #C4532A)';
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = 'Actualizar cargadores UTE';
 }
 
 /* ── Init ─────────────────────────────────────────────────────── */

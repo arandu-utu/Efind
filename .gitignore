@@ -10,3 +10,6 @@ Thumbs.db
 # Temp
 *.tmp
 sol_preview.html
+
+# Credenciales del servidor — nunca deben subirse al repo
+includes/
