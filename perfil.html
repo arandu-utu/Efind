@@ -105,6 +105,7 @@
               </div>
             </div>
             <button class="btn btn--primary btn--sm" onclick="agregarVehiculo()">Guardar vehículo</button>
+            <div id="alert-vehiculos" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -165,6 +166,7 @@ if (U.empresa) {
 
 /* Tab Calificaciones + estrellas del sidebar (misma fuente, un solo fetch) */
 async function renderCalificaciones() {
+  mostrarCargando('calificaciones-list');
   const j = await apiFetch('/api/calificaciones.php').catch(()=>({ok:false}));
   const { promedio=null, total=0, calificaciones=[] } = j.ok ? j.data : {};
   document.getElementById('user-stars-sidebar').innerHTML = renderStars(promedio, total);
@@ -212,6 +214,7 @@ function switchTab(n, btn) {
 /* Vehículos */
 async function renderVehiculos() {
   const el = document.getElementById('lista-vehiculos');
+  mostrarCargando('lista-vehiculos');
   try {
     const json = await apiFetch('/api/vehiculos.php');
     const vehs = json.ok ? json.data : [];
@@ -239,28 +242,32 @@ async function agregarVehiculo() {
   const modelo = document.getElementById('v-modelo').value.trim();
   const cap    = +document.getElementById('v-cap').value;
   const tipo_conector = document.getElementById('v-conector').value;
-  if (!marca || !modelo || !cap) { alert(I18N.autoT('Completá todos los campos.')); return; }
+  if (!marca || !modelo || !cap) { showAlert('alert-vehiculos', 'Completá todos los campos.', 'warn', 4000); return; }
 
   try {
     const json = await apiFetch('/api/vehiculos.php', 'POST', { marca, modelo, capacidad_kwh: cap, tipo_conector });
-    if (!json.ok) { alert(json.error || 'No se pudo guardar el vehículo.'); return; }
+    if (!json.ok) { showAlert('alert-vehiculos', json.error || 'No se pudo guardar el vehículo.', 'error', 5000); return; }
     document.getElementById('v-marca').value  = '';
     document.getElementById('v-modelo').value = '';
     document.getElementById('v-cap').value    = '';
+    showAlert('alert-vehiculos', '✓ Vehículo agregado.', 'success', 3000);
     renderVehiculos();
   } catch {
-    alert('Error de conexión con el servidor.');
+    showAlert('alert-vehiculos', 'Error de conexión con el servidor.', 'error', 5000);
   }
 }
 
 async function eliminarVehiculo(id) {
-  if (!confirm(I18N.autoT('¿Eliminar este vehículo?'))) return;
+  const ok = await confirmar('Se va a dar de baja este vehículo de tu perfil.',
+                             { titulo: 'Eliminar vehículo', aceptar: 'Eliminar', peligro: true });
+  if (!ok) return;
   try {
     const json = await apiFetch(`/api/vehiculos.php?id=${id}`, 'DELETE');
-    if (!json.ok) { alert(json.error || 'No se pudo eliminar.'); return; }
+    if (!json.ok) { showAlert('alert-vehiculos', json.error || 'No se pudo eliminar.', 'error', 5000); return; }
+    showAlert('alert-vehiculos', '✓ Vehículo eliminado.', 'success', 3000);
     renderVehiculos();
   } catch {
-    alert('Error de conexión con el servidor.');
+    showAlert('alert-vehiculos', 'Error de conexión con el servidor.', 'error', 5000);
   }
 }
 
@@ -268,6 +275,7 @@ async function eliminarVehiculo(id) {
 async function renderMisCargadores() {
   const el = document.getElementById('lista-mis-cargadores');
   const badgeMap = {disponible:'badge-green',ocupado:'badge-orange',sin_servicio:'badge-gray'};
+  mostrarCargando('lista-mis-cargadores');
   const lista = await apiFetch('/api/estaciones.php').then(j=>j.ok?j.data.filter(c=>c.propietario_id===U.id):[]).catch(()=>[]);
   el.innerHTML = lista.length ? `
     <table class="data-table">
@@ -287,6 +295,7 @@ async function renderMisCargadores() {
 /* Historial */
 async function renderHistorial() {
   const el = document.getElementById('lista-trans');
+  mostrarCargando('lista-trans');
   const trans = await apiFetch('/api/reservas.php').then(j=>j.ok?j.data:[]).catch(()=>[]);
   el.innerHTML = trans.length ? `
     <table class="data-table">

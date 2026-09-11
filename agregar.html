@@ -42,6 +42,7 @@
         <button class="btn btn--primary btn--sm" onclick="buscarDir()">Buscar</button>
       </div>
     </div>
+    <div id="alert-ubicacion" style="display:none;margin-bottom:.75rem"></div>
     <div id="mapa-nuevo" style="height:280px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);margin-bottom:.75rem"></div>
     <div class="alert alert-info" style="font-size:.8rem;margin-bottom:.75rem"><span data-icon="info" data-size="14"></span> Hacé clic en el mapa para colocar el marcador con precisión.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
@@ -170,7 +171,7 @@ function buscarDir() {
   fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`)
     .then(r => r.json())
     .then(data => {
-      if (!data.length) { alert(I18N.autoT('Dirección no encontrada, hacé clic en el mapa.')); return; }
+      if (!data.length) { showAlert('alert-ubicacion', 'Dirección no encontrada, hacé clic en el mapa.', 'warn', 5000); return; }
       const { lat, lon, display_name } = data[0];
       mapa.setView([lat, lon], 16);
       if (marker) mapa.removeLayer(marker);
@@ -180,7 +181,7 @@ function buscarDir() {
       document.getElementById('inp-lat').value = latSel;
       document.getElementById('inp-lng').value = lngSel;
       document.getElementById('dir-final').value = display_name.split(',').slice(0,3).join(',');
-    }).catch(() => alert(I18N.autoT('No se pudo buscar la dirección. Hacé clic en el mapa.')));
+    }).catch(() => showAlert('alert-ubicacion', 'No se pudo buscar la dirección. Hacé clic en el mapa.', 'error', 5000));
 }
 
 /* Tipo de acceso */
@@ -214,7 +215,7 @@ function quitarConector(i) { conectores.splice(i,1); renderConectores(); }
 function irPaso(n) {
   /* Validaciones */
   if (n > 0 && pasoActual === 0 && (!latSel || !lngSel)) {
-    alert(I18N.autoT('Hacé clic en el mapa para seleccionar la ubicación.')); return;
+    showAlert('alert-ubicacion', 'Hacé clic en el mapa para seleccionar la ubicación.', 'warn', 5000); return;
   }
   if (n > 1 && pasoActual === 1) {
     const nom = document.getElementById('nombre-c').value.trim();

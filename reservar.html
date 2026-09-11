@@ -137,6 +137,7 @@
         </div>
         <textarea id="rating-comentario" class="form-textarea" rows="2"
           placeholder="Comentario opcional…" style="margin-bottom:.75rem"></textarea>
+        <div id="alert-rating" style="display:none;margin-bottom:.75rem"></div>
         <button class="btn btn--green btn--sm" onclick="enviarCalificacion()">Enviar calificación</button>
         <button class="btn btn--ghost btn--sm" onclick="document.getElementById('rating-section').style.display='none'" style="margin-left:.5rem">Omitir</button>
       </div>
@@ -155,7 +156,7 @@
   let pickerCalificacion = null;
 
   async function enviarCalificacion() {
-    if (!pickerCalificacion?.valor) { alert(I18N.autoT('Seleccioná una puntuación antes de enviar.')); return; }
+    if (!pickerCalificacion?.valor) { showAlert('alert-rating', 'Seleccioná una puntuación antes de enviar.', 'warn', 4000); return; }
     if (!window._txPropietarioId) return;
     await apiFetch('/api/calificaciones.php', 'POST', {
       para_usuario_id: window._txPropietarioId, transaccion_id: window._txId,

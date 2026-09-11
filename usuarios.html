@@ -94,8 +94,16 @@ let usuarios = [];
 
 /* ── Carga inicial ─────────────────────────────────────────────── */
 async function init() {
-  const res = await apiFetch('/api/usuarios.php');
-  if (!res.ok) { console.error('Error al cargar usuarios:', res.error); return; }
+  /* El contenedor es un <tbody>, así que el placeholder va como fila propia. */
+  document.getElementById('tbody-usuarios').innerHTML =
+    `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--soft);font-size:.85rem">
+       <span class="spinner" style="vertical-align:middle;margin-right:.5rem"></span>Cargando usuarios…</td></tr>`;
+  const res = await apiFetch('/api/usuarios.php').catch(() => ({ ok: false, error: 'Error de conexión con el servidor.' }));
+  if (!res.ok) {
+    document.getElementById('tbody-usuarios').innerHTML = '';
+    showAlert('alert-accion', 'No se pudieron cargar los usuarios. ' + (res.error || ''), 'error');
+    return;
+  }
   usuarios = res.data;
   renderTabla();
 }

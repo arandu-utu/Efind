@@ -54,6 +54,52 @@ function showAlert(id, msg, tipo = 'error', ocultarMs = 0) {
   if (ocultarMs) setTimeout(() => el.style.display = 'none', ocultarMs);
 }
 
+/* ── Placeholder mientras se espera la respuesta de una API ──────────
+   Traduce con autoT en vez de I18N.apply(): apply() emite 'i18n:change',
+   y hay páginas suscritas que re-renderizan la lista y borrarían esto. */
+function mostrarCargando(id, texto = 'Cargando…') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;gap:.6rem;
+       padding:2rem 1rem;color:var(--soft);font-size:.85rem">
+       <span class="spinner"></span>${escapeHtml(I18N.autoT(texto))}</div>`;
+}
+
+/* ── Confirmación en un modal propio, en lugar del confirm() del navegador.
+   Devuelve una promesa que resuelve a true si el usuario acepta. */
+function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', peligro = false } = {}) {
+  return new Promise(resolve => {
+    const t = s => escapeHtml(I18N.autoT(s));
+    const ov = document.createElement('div');
+    ov.className = 'modal-overlay center';
+    ov.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" style="max-width:400px">
+        <div class="modal__title">${t(titulo)}</div>
+        <p style="font-size:.9rem;color:var(--soft);line-height:1.5">${t(mensaje)}</p>
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem">
+          <button class="btn btn--ghost btn--sm" data-r="0">${t('Cancelar')}</button>
+          <button class="btn btn--${peligro ? 'warn' : 'primary'} btn--sm" data-r="1">${t(aceptar)}</button>
+        </div>
+      </div>`;
+
+    const cerrar = valor => {
+      document.removeEventListener('keydown', alTeclear);
+      ov.remove();
+      resolve(valor);
+    };
+    const alTeclear = e => { if (e.key === 'Escape') cerrar(false); };
+
+    ov.addEventListener('click', e => {
+      if (e.target === ov) return cerrar(false);
+      const btn = e.target.closest('[data-r]');
+      if (btn) cerrar(btn.dataset.r === '1');
+    });
+    document.addEventListener('keydown', alTeclear);
+    document.body.appendChild(ov);
+    ov.querySelector('[data-r="1"]').focus();
+  });
+}
+
 /* ── Escapar HTML antes de insertar texto de usuario con innerHTML ──── */
 function escapeHtml(str) {
   const d = document.createElement('div');

@@ -67,6 +67,7 @@
     <!-- Reportes abiertos -->
     <div class="card" id="reportes" style="margin-top:1.25rem">
       <div class="card__title"><span data-icon="warning" data-size="16"></span> Reportes abiertos</div>
+      <div id="alert-admin" style="display:none;margin-bottom:.75rem"></div>
       <div id="lista-reportes"></div>
     </div>
 
@@ -105,6 +106,7 @@ let reportes = [];
 
 /* ── Carga inicial: todas las APIs en paralelo ───────────────── */
 async function initDashboard() {
+  ['lista-resenas-pend', 'lista-reportes'].forEach(id => mostrarCargando(id));
   try {
     const [sRes, rRes, reRes, eRes] = await Promise.all([
       apiFetch('/api/stats.php'),
@@ -114,12 +116,20 @@ async function initDashboard() {
     ]);
 
     if (sRes.ok)  renderStats(sRes.data);
-    if (rRes.ok)  { reportes = rRes.data;  renderReportes(); }
-    if (reRes.ok) { resenas  = reRes.data; renderResenas();  }
     if (eRes.ok)  renderCargadores(eRes.data);
+
+    /* Cada lista se resuelve por separado: si su API falla hay que sacar el
+       placeholder de carga, si no queda el spinner girando para siempre. */
+    if (rRes.ok) { reportes = rRes.data; renderReportes(); }
+    else showAlert('lista-reportes', 'No se pudieron cargar los reportes.', 'warn');
+
+    if (reRes.ok) { resenas = reRes.data; renderResenas(); }
+    else showAlert('lista-resenas-pend', 'No se pudieron cargar las reseñas.', 'warn');
 
   } catch (e) {
     console.error('Error al cargar dashboard:', e);
+    showAlert('lista-reportes', 'Error de conexión con el servidor.', 'error');
+    showAlert('lista-resenas-pend', 'Error de conexión con el servidor.', 'error');
   }
 }
 
@@ -258,7 +268,7 @@ async function resolverReporte(id, puntoCargaId) {
   if (nuevoEstado) {
     const rEstado = await apiFetch('/api/estado.php', 'PATCH', { punto_carga_id: puntoCargaId, estado: nuevoEstado });
     if (!rEstado.ok) {
-      alert('No se pudo actualizar el estado del cargador: ' + (rEstado.error || ''));
+      showAlert('alert-admin', 'No se pudo actualizar el estado del cargador. ' + (rEstado.error || ''), 'error', 5000);
       return;
     }
   }

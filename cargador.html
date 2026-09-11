@@ -101,6 +101,7 @@ let C = null;   // se rellena con datos de la API
 
 (async () => {
   if (!ID) { mostrarError('ID de cargador no especificado.'); return; }
+  mostrarCargando('page-content', 'Cargando cargador…');
 
   try {
     const json = await apiFetch(`/api/estacion.php?id=${ID}`);
