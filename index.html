@@ -36,6 +36,7 @@
             id="buscador"
             class="form-input"
             placeholder="Buscar cargador o dirección…"
+            data-i18n-placeholder="buscar_placeholder"
             style="font-size:.85rem;padding-left:2.1rem"
           >
         </div>
@@ -45,7 +46,7 @@
 
         <!-- Filtros -->
         <div class="filter-section">
-          <div class="filter-title">Tipo de conector</div>
+          <div class="filter-title" data-i18n="tipo_conector">Tipo de conector</div>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="Type 2"   checked> Type 2</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="CCS2"     checked> CCS2</label>
           <label class="check-row"><input type="checkbox" class="f-tipo" value="CHAdeMO"  checked> CHAdeMO</label>
@@ -55,9 +56,9 @@
         </div>
 
         <div class="filter-section">
-          <div class="filter-title">Potencia mínima</div>
+          <div class="filter-title" data-i18n="potencia_minima">Potencia mínima</div>
           <select id="f-potencia" class="form-select" style="font-size:.85rem">
-            <option value="0">Cualquiera</option>
+            <option value="0" data-i18n="potencia_cualquiera">Cualquiera</option>
             <option value="7">7 kW +</option>
             <option value="22">22 kW +</option>
             <option value="50">50 kW + (DC rápido)</option>
@@ -65,28 +66,28 @@
         </div>
 
         <div class="filter-section">
-          <div class="filter-title">Estado</div>
-          <label class="check-row"><input type="checkbox" class="f-estado" value="disponible" checked> <span class="badge badge-green"  style="font-size:.72rem">Disponible</span></label>
-          <label class="check-row"><input type="checkbox" class="f-estado" value="ocupado"    checked> <span class="badge badge-orange" style="font-size:.72rem">Ocupado</span></label>
-          <label class="check-row"><input type="checkbox" class="f-estado" value="sin_servicio">       <span class="badge badge-gray"   style="font-size:.72rem">Sin servicio</span></label>
+          <div class="filter-title" data-i18n="estado">Estado</div>
+          <label class="check-row"><input type="checkbox" class="f-estado" value="disponible" checked> <span class="badge badge-green"  style="font-size:.72rem" data-i18n="estado_disponible">Disponible</span></label>
+          <label class="check-row"><input type="checkbox" class="f-estado" value="ocupado"    checked> <span class="badge badge-orange" style="font-size:.72rem" data-i18n="estado_ocupado">Ocupado</span></label>
+          <label class="check-row"><input type="checkbox" class="f-estado" value="sin_servicio">       <span class="badge badge-gray"   style="font-size:.72rem" data-i18n="estado_sinservicio">Sin servicio</span></label>
         </div>
 
         <div class="filter-section">
-          <div class="filter-title">Acceso</div>
-          <label class="check-row"><input type="checkbox" class="f-acceso" value="publico"  checked> Público</label>
-          <label class="check-row"><input type="checkbox" class="f-acceso" value="privado"  checked> Privado / Alquiler</label>
+          <div class="filter-title" data-i18n="acceso">Acceso</div>
+          <label class="check-row"><input type="checkbox" class="f-acceso" value="publico"  checked> <span data-i18n="acceso_publico">Público</span></label>
+          <label class="check-row"><input type="checkbox" class="f-acceso" value="privado"  checked> <span data-i18n="acceso_privado">Privado / Alquiler</span></label>
         </div>
 
         <div class="filter-section">
-          <div class="filter-title">Fuente</div>
+          <div class="filter-title" data-i18n="fuente">Fuente</div>
           <label class="check-row">
             <input type="checkbox" id="f-ute" checked>
-            Red UTE <span class="badge badge-ute" style="font-size:.65rem;padding:.1rem .4rem">UTE</span>
+            <span data-i18n="red_ute">Red UTE</span> <span class="badge badge-ute" style="font-size:.65rem;padding:.1rem .4rem">UTE</span>
           </label>
         </div>
 
         <div style="padding:.6rem 1rem">
-          <button class="btn btn--primary btn--full btn--sm" id="btn-filtrar">Aplicar filtros</button>
+          <button class="btn btn--primary btn--full btn--sm" id="btn-filtrar" data-i18n="aplicar_filtros">Aplicar filtros</button>
         </div>
 
         <!-- Lista resultado -->
@@ -108,9 +109,9 @@
 
 <!-- Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script src="js/estimador.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════
@@ -193,7 +194,11 @@ let todasEstaciones = [];  // Todo lo que devuelve /api/estaciones.php (E-Find +
 
 // ── Lista lateral ──────────────────────────────────────────
 const _BADGE = { disponible: 'badge-green', ocupado: 'badge-orange', sin_servicio: 'badge-gray' };
-const _LABEL = { disponible: 'Disponible',  ocupado: 'Ocupado',      sin_servicio: 'Sin servicio' };
+const _ESTADO_KEY = { disponible: 'estado_disponible', ocupado: 'estado_ocupado', sin_servicio: 'estado_sinservicio' };
+function _LABEL_OF(estado) {
+  const key = _ESTADO_KEY[estado];
+  return key ? I18N.t(key) : estado;
+}
 
 function renderLista(lista) {
   const el = document.getElementById('charger-list');
@@ -207,15 +212,15 @@ function renderLista(lista) {
   if (!ordenada.length) {
     el.innerHTML = `<div class="empty-state" style="padding:2rem 1rem">
       <div class="empty-state__icon">${ICONS.bolt(40)}</div>
-      <div class="empty-state__title">Sin cargadores</div>
-      <div class="empty-state__body">Probá ajustando los filtros o buscá en otra zona del mapa.</div>
+      <div class="empty-state__title">${I18N.t('sin_cargadores')}</div>
+      <div class="empty-state__body">${I18N.t('sin_cargadores_body')}</div>
     </div>`;
     return;
   }
 
   el.innerHTML = ordenada.map(c => {
     const badge  = _BADGE[c.estado] ?? 'badge-gray';
-    const label  = _LABEL[c.estado] ?? c.estado;
+    const label  = _LABEL_OF(c.estado);
     const potMax = c.conectores.length ? Math.max(...c.conectores.map(x => x.potencia)) : 0;
     const uteTag = c.fuente === 'ute'
       ? `<span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem;vertical-align:middle">UTE</span>`
@@ -223,8 +228,8 @@ function renderLista(lista) {
     return `
       <div class="charger-item" onclick="irA(${c.lat},${c.lng},${c.id})">
         <div class="charger-item__info">
-          <strong>${c.nombre} ${uteTag}</strong>
-          <span>${(c.direccion || '').split(',')[0]} · ${potMax} kW</span>
+          <strong>${escapeHtml(c.nombre)} ${uteTag}</strong>
+          <span>${escapeHtml((c.direccion || '').split(',')[0])} · ${potMax} kW</span>
         </div>
         <span class="badge ${badge}" style="font-size:.7rem">${label}</span>
       </div>`;
@@ -268,8 +273,8 @@ function abrirPopup(c) {
   const badgeClass = _BADGE[c.estado] ?? 'badge-gray';
   const potMax     = c.conectores.length ? Math.max(...c.conectores.map(x => x.potencia)) : 0;
   const conTypes   = [...new Set(c.conectores.map(x => x.tipo))].join(' · ') || 'Sin datos';
-  const precio     = c.costo_kwh ? `$${c.costo_kwh}/kWh` : 'Gratuito';
-  const horario    = c.horario || 'No especificado';
+  const precio     = c.costo_kwh ? `$${c.costo_kwh}/kWh` : I18N.t('gratuito');
+  const horario    = c.horario || I18N.t('no_especificado');
   const uteTag     = esUte
     ? `<span class="badge badge-ute" style="font-size:.62rem;vertical-align:middle;padding:.1rem .4rem">UTE</span>`
     : '';
@@ -281,21 +286,21 @@ function abrirPopup(c) {
   document.getElementById('popup-content').innerHTML = `
     <button class="modal__close" onclick="cerrarPopup()">&times;</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
-      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${c.nombre} ${uteTag}</h2>
-      <span class="badge ${badgeClass}">${_LABEL[c.estado] ?? c.estado}</span>
+      <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${escapeHtml(c.nombre)} ${uteTag}</h2>
+      <span class="badge ${badgeClass}">${_LABEL_OF(c.estado)}</span>
     </div>
-    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.65rem">${c.direccion || ''}</p>
+    <p style="font-size:.82rem;color:var(--soft);margin-bottom:.65rem">${escapeHtml(c.direccion)}</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .6rem;font-size:.82rem;margin:.65rem 0">
-      <div><span style="color:var(--soft)">Potencia:</span> <strong>${potMax} kW</strong></div>
-      <div><span style="color:var(--soft)">Conectores:</span> <strong>${conTypes}</strong></div>
-      <div><span style="color:var(--soft)">Horario:</span> <strong>${horario}</strong></div>
-      <div><span style="color:var(--soft)">Precio:</span> <strong>${precio}</strong></div>
+      <div><span style="color:var(--soft)">${I18N.t('potencia')}:</span> <strong>${potMax} kW</strong></div>
+      <div><span style="color:var(--soft)">${I18N.t('conectores')}:</span> <strong>${conTypes}</strong></div>
+      <div><span style="color:var(--soft)">${I18N.t('horario')}:</span> <strong>${horario}</strong></div>
+      <div><span style="color:var(--soft)">${I18N.t('precio')}:</span> <strong>${precio}</strong></div>
     </div>
     ${fuenteInfo}
     <div style="display:flex;gap:.5rem;margin-top:.9rem;flex-wrap:wrap">
-      <a href="cargador.html?id=${c.id}" class="btn btn--primary btn--sm">Ver detalle</a>
-      <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" class="btn btn--outline btn--sm">Cómo llegar</a>
-      ${u && !esUte ? `<a href="reportar.html?id=${c.id}" class="btn btn--ghost btn--sm">Reportar</a>` : ''}
+      <a href="cargador.html?id=${c.id}" class="btn btn--primary btn--sm">${I18N.t('ver_detalle')}</a>
+      <a href="https://maps.google.com/?q=${c.lat},${c.lng}" target="_blank" class="btn btn--outline btn--sm">${I18N.t('como_llegar')}</a>
+      ${u && !esUte ? `<a href="cargador.html?id=${c.id}&reportar=1" class="btn btn--ghost btn--sm">${I18N.t('reportar')}</a>` : ''}
     </div>
   `;
   document.getElementById('popup-overlay').style.display = 'flex';
@@ -311,20 +316,20 @@ leyenda.onAdd = () => {
   const div = L.DomUtil.create('div', '');
   div.style.cssText = 'background:white;padding:8px 10px;border-radius:8px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1.9';
   div.innerHTML = `
-    <strong style="display:block;margin-bottom:4px;color:#1A2E44;font-size:11px">Estado</strong>
-    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#3BB273;flex-shrink:0"></span> Disponible</div>
-    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#E76F51;flex-shrink:0"></span> Ocupado</div>
-    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#9E9E9E;flex-shrink:0"></span> Sin servicio</div>
+    <strong data-i18n="estado" style="display:block;margin-bottom:4px;color:#1A2E44;font-size:11px">Estado</strong>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#3BB273;flex-shrink:0"></span> <span data-i18n="estado_disponible">Disponible</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#E76F51;flex-shrink:0"></span> <span data-i18n="estado_ocupado">Ocupado</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#9E9E9E;flex-shrink:0"></span> <span data-i18n="estado_sinservicio">Sin servicio</span></div>
     <hr style="border:none;border-top:1px solid #E5E7EB;margin:5px 0">
-    <strong style="display:block;margin-bottom:4px;color:#1A2E44;font-size:11px">Fuente</strong>
+    <strong data-i18n="fuente" style="display:block;margin-bottom:4px;color:#1A2E44;font-size:11px">Fuente</strong>
     <div style="color:#5C6B82;display:flex;align-items:center;gap:5px;font-size:10px">
-      <svg width="11" height="11" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#9E9E9E" stroke="#6B6B6B" stroke-width="2"/></svg> E-Find público
+      <svg width="11" height="11" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#9E9E9E" stroke="#6B6B6B" stroke-width="2"/></svg> <span data-i18n="leyenda_efind_publico">E-Find público</span>
     </div>
     <div style="color:#5C6B82;display:flex;align-items:center;gap:5px;font-size:10px">
-      <svg width="11" height="11" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="#9E9E9E" stroke="#6B6B6B" stroke-width="2"/></svg> E-Find privado
+      <svg width="11" height="11" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="#9E9E9E" stroke="#6B6B6B" stroke-width="2"/></svg> <span data-i18n="leyenda_efind_privado">E-Find privado</span>
     </div>
     <div style="color:#5C6B82;display:flex;align-items:center;gap:5px;font-size:10px">
-      <svg width="11" height="11" viewBox="0 0 26 26"><g transform="translate(13,13) rotate(45)"><rect x="-7" y="-7" width="14" height="14" rx="2" fill="#9E9E9E" stroke="#1B4F9C" stroke-width="2"/></g></svg> Red UTE
+      <svg width="11" height="11" viewBox="0 0 26 26"><g transform="translate(13,13) rotate(45)"><rect x="-7" y="-7" width="14" height="14" rx="2" fill="#9E9E9E" stroke="#1B4F9C" stroke-width="2"/></g></svg> <span data-i18n="red_ute">Red UTE</span>
     </div>
   `;
   return div;
@@ -354,6 +359,7 @@ document.getElementById('buscador').addEventListener('input', aplicarFiltros);
 document.querySelectorAll('.f-tipo,.f-estado,.f-acceso').forEach(el => el.addEventListener('change', aplicarFiltros));
 document.getElementById('f-potencia').addEventListener('change', aplicarFiltros);
 document.getElementById('f-ute').addEventListener('change', aplicarFiltros);
+window.addEventListener('i18n:change', aplicarFiltros);
 
 // ── Arranque ─────────────────────────────────────────────────
 cargarEstaciones();

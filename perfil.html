@@ -66,7 +66,7 @@
             <dt style="color:var(--soft)">Email</dt>       <dd id="p-email"  style="font-weight:600"></dd>
             <dt style="color:var(--soft)">CI / RUT</dt>    <dd id="p-ci"     style="font-weight:600"></dd>
             <dt style="color:var(--soft)">Rol</dt>         <dd id="p-rol"    style="font-weight:600"></dd>
-            <dt style="color:var(--soft)" id="lbl-emp">Empresa</dt><dd id="p-emp" style="font-weight:600;display:none"></dd>
+            <dt style="color:var(--soft);display:none" id="lbl-emp">Empresa</dt><dd id="p-emp" style="font-weight:600;display:none"></dd>
           </dl>
         </div>
       </div>
@@ -98,8 +98,9 @@
               <div class="form-group">
                 <label class="form-label">Tipo de conector</label>
                 <select id="v-conector" class="form-select">
-                  <option>CCS2</option><option>Tipo 2</option>
+                  <option>Type 2</option><option>CCS2</option>
                   <option>CHAdeMO</option><option>Schuko</option>
+                  <option>GB/T AC</option><option>GB/T DC</option>
                 </select>
               </div>
             </div>
@@ -132,96 +133,76 @@
 
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script>
 requireAuth();
 const U = Auth.get();
 
+/* La sesión real (api/login.php) solo trae id/nombre/email/rol_id — el resto
+   (ci_rut, empresa, calificaciones) todavía no lo persiste el backend
+   (ver registro.html: hoy no envía ci/empresa a la API). Se completa acá
+   con valores derivados o "—" en vez de dejar campos en blanco/undefined. */
+const ROLES_POR_ID = { 1: 'Administrador', 2: 'Usuario Particular', 3: 'Propietario' };
+const rolLabel = ROLES_POR_ID[U.rol_id] || { particular:'Usuario Particular', empresa:'Empresa', moderador:'Moderador', admin:'Administrador' }[U.rol] || '—';
+const avatar   = U.avatar || (U.nombre ? U.nombre.trim()[0].toUpperCase() : '?');
+
 /* Sidebar */
-document.getElementById('avatar-big').textContent = U.avatar;
+document.getElementById('avatar-big').textContent = avatar;
 document.getElementById('user-nombre').textContent = U.nombre;
-const roles = {particular:'Usuario Particular',empresa:'Empresa',moderador:'Moderador',admin:'Administrador'};
-document.getElementById('user-rol').textContent = roles[U.rol] || U.rol;
+document.getElementById('user-rol').textContent = rolLabel;
 
 /* Tab perfil */
 document.getElementById('p-nombre').textContent = U.nombre;
-document.getElementById('p-email').textContent  = U.email;
-document.getElementById('p-ci').textContent     = U.ci_rut;
-document.getElementById('p-rol').textContent    = roles[U.rol] || U.rol;
+document.getElementById('p-email').textContent  = U.email || '—';
+document.getElementById('p-ci').textContent     = U.ci_rut || '—';
+document.getElementById('p-rol').textContent    = rolLabel;
 if (U.empresa) {
   document.getElementById('lbl-emp').style.display = '';
   document.getElementById('p-emp').style.display   = '';
   document.getElementById('p-emp').textContent      = U.empresa;
 }
 
-/* Rating sidebar */
-document.getElementById('user-stars-sidebar').innerHTML = renderStars(U.calificacion_promedio, U.num_calificaciones);
+/* Tab Calificaciones + estrellas del sidebar (misma fuente, un solo fetch) */
+async function renderCalificaciones() {
+  const j = await fetch('/api/calificaciones.php').then(r=>r.json()).catch(()=>({ok:false}));
+  const { promedio=null, total=0, calificaciones=[] } = j.ok ? j.data : {};
+  document.getElementById('user-stars-sidebar').innerHTML = renderStars(promedio, total);
 
-/* Tab Calificaciones */
-function renderCalificaciones() {
-  const all = getMock('calificaciones').filter(c => c.para_usuario_id === U.id);
   const block = document.getElementById('rating-summary-block');
   const list  = document.getElementById('calificaciones-list');
-
-  if (all.length === 0) {
-    block.innerHTML = '<div class="empty-state"><div class="empty-state__icon">' + ICONS.sun(44) + '</div><div class="empty-state__title">Sin calificaciones</div><div class="empty-state__body">Aún no tenés calificaciones de otros usuarios.</div></div>';
+  if (!total) {
+    block.innerHTML = `<div class="empty-state"><div class="empty-state__icon">${ICONS.sun(44)}</div><div class="empty-state__title">Sin calificaciones</div><div class="empty-state__body">Aún no tenés calificaciones de otros usuarios.</div></div>`;
     list.innerHTML = '';
     return;
   }
-
-  const prom   = (all.reduce((s, c) => s + c.puntos, 0) / all.length).toFixed(1);
-  const filled = Math.round(+prom);
-
-  // Build star row without nested template literals
-  const starsRow = Array.from({length: 5}, (_, i) =>
-    '<span style="color:' + (i < filled ? '#F5B800' : '#C8D3DF') + '">' + solSVG(26) + '</span>'
-  ).join('');
-
-  block.innerHTML =
-    '<div class="rating-summary">' +
-      '<div>' +
-        '<div class="rating-big-num">' + prom + '</div>' +
-        '<div class="rating-big-stars">' + starsRow + '</div>' +
-      '</div>' +
-      '<div>' +
-        '<div style="font-weight:600;font-size:.9rem">Calificación promedio</div>' +
-        '<div class="rating-big-count">' + all.length + ' calificación' + (all.length !== 1 ? 'es' : '') + ' recibida' + (all.length !== 1 ? 's' : '') + '</div>' +
-      '</div>' +
-    '</div>';
-
-  const usuarios = getMock('usuarios');
-  list.innerHTML = all.map(function(c) {
-    const de    = usuarios.find(u => u.id === c.de_usuario_id);
-    const av    = de ? de.avatar : '?';
-    const nm    = de ? de.nombre : 'Usuario';
-    const tipo  = c.tipo === 'propietario_a_cliente' ? 'Como cliente' : 'Como propietario';
-    const stars = Array.from({length: 5}, (_, i) =>
-      '<span style="color:' + (i < c.puntos ? '#F5B800' : '#C8D3DF') + '">' + solSVG(14) + '</span>'
-    ).join('');
-    const comment = c.comentario
-      ? '<div class="cal-text">"' + c.comentario + '"</div>'
-      : '';
-    return (
-      '<div class="cal-item">' +
-        '<div class="cal-avatar">' + av + '</div>' +
-        '<div class="cal-body">' +
-          '<div class="cal-header">' +
-            '<span class="cal-name">'  + nm    + '</span>' +
-            '<span class="cal-stars">' + stars + '</span>' +
-            '<span class="cal-date">'  + c.fecha + '</span>' +
-          '</div>' +
-          '<div class="cal-tipo">' + tipo + '</div>' +
-          comment +
-        '</div>' +
-      '</div>'
-    );
-  }).join('');
+  const stars = (n,px) => Array.from({length:5},(_,i)=>`<span style="color:${i<n?'#F5B800':'#C8D3DF'}">${solSVG(px)}</span>`).join('');
+  block.innerHTML = `<div class="rating-summary">
+      <div><div class="rating-big-num">${promedio}</div><div class="rating-big-stars">${stars(Math.round(promedio),26)}</div></div>
+      <div><div style="font-weight:600;font-size:.9rem">Calificación promedio</div>
+        <div class="rating-big-count">${total} calificación${total!==1?'es':''} recibida${total!==1?'s':''}</div></div>
+    </div>`;
+  list.innerHTML = calificaciones.map(c => `
+    <div class="cal-item">
+      <div class="cal-avatar">${escapeHtml(c.de_nombre[0].toUpperCase())}</div>
+      <div class="cal-body">
+        <div class="cal-header">
+          <span class="cal-name">${escapeHtml(c.de_nombre)}</span>
+          <span class="cal-stars">${stars(c.puntos,14)}</span>
+          <span class="cal-date">${c.fecha}</span>
+        </div>
+        <div class="cal-tipo">${c.tipo==='propietario_a_cliente'?'Como cliente':'Como propietario'}</div>
+        ${c.comentario ? `<div class="cal-text">"${escapeHtml(c.comentario)}"</div>` : ''}
+      </div>
+    </div>`).join('');
+  I18N.apply(false);
 }
 renderCalificaciones();
 
 /* Tabs */
 function switchTab(n, btn) {
-  document.querySelectorAll('.tab-panel').forEach((p,i) => p.classList.toggle('active', i===n));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + n).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   if (n===1) renderVehiculos();
@@ -230,88 +211,109 @@ function switchTab(n, btn) {
 }
 
 /* Vehículos */
-function renderVehiculos() {
-  const vehs = getMock('vehiculos').filter(v=>v.usuario_id===U.id);
+async function renderVehiculos() {
   const el = document.getElementById('lista-vehiculos');
-  el.innerHTML = vehs.length ? `
-    <table class="data-table">
-      <thead><tr><th>Marca</th><th>Modelo</th><th>Capacidad</th><th>Conector</th><th></th></tr></thead>
-      <tbody>
-        ${vehs.map(v=>`
-        <tr>
-          <td>${v.marca}</td><td>${v.modelo}</td>
-          <td>${v.capacidad_kwh} kWh</td>
-          <td>${v.conector}</td>
-          <td><button class="btn btn--ghost btn--sm" onclick="eliminarVehiculo(${v.id})">${ICONS.x(14)}</button></td>
-        </tr>`).join('')}
-      </tbody>
-    </table>` : '<p style="font-size:.88rem;color:var(--soft)">No tenés vehículos registrados.</p>';
+  try {
+    const res  = await fetch('/api/vehiculos.php');
+    const json = await res.json();
+    const vehs = json.ok ? json.data : [];
+    el.innerHTML = vehs.length ? `
+      <table class="data-table">
+        <thead><tr><th>Marca</th><th>Modelo</th><th>Capacidad</th><th>Conector</th><th></th></tr></thead>
+        <tbody>
+          ${vehs.map(v=>`
+          <tr>
+            <td>${escapeHtml(v.marca)}</td><td>${escapeHtml(v.modelo)}</td>
+            <td>${v.capacidad_kwh} kWh</td>
+            <td>${escapeHtml(v.tipo_conector)}</td>
+            <td><button class="btn btn--ghost btn--sm" onclick="eliminarVehiculo(${v.id})">${ICONS.x(14)}</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : '<p style="font-size:.88rem;color:var(--soft)">No tenés vehículos registrados.</p>';
+  } catch {
+    el.innerHTML = '<p style="font-size:.88rem;color:var(--warn)">Error al cargar tus vehículos.</p>';
+  }
+  I18N.apply(false);
 }
 
-function agregarVehiculo() {
-  const marca = document.getElementById('v-marca').value.trim();
-  const modelo= document.getElementById('v-modelo').value.trim();
-  const cap   = +document.getElementById('v-cap').value;
-  const conector = document.getElementById('v-conector').value;
-  if (!marca || !modelo || !cap) { alert('Completá todos los campos.'); return; }
-  const lista = getMock('vehiculos');
-  lista.push({ id:Date.now(), usuario_id:U.id, marca, modelo, capacidad_kwh:cap, conector });
-  setMock('vehiculos', lista);
-  document.getElementById('v-marca').value  = '';
-  document.getElementById('v-modelo').value = '';
-  document.getElementById('v-cap').value    = '';
-  renderVehiculos();
+async function agregarVehiculo() {
+  const marca  = document.getElementById('v-marca').value.trim();
+  const modelo = document.getElementById('v-modelo').value.trim();
+  const cap    = +document.getElementById('v-cap').value;
+  const tipo_conector = document.getElementById('v-conector').value;
+  if (!marca || !modelo || !cap) { alert(I18N.autoT('Completá todos los campos.')); return; }
+
+  try {
+    const res  = await fetch('/api/vehiculos.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ marca, modelo, capacidad_kwh: cap, tipo_conector }),
+    });
+    const json = await res.json();
+    if (!json.ok) { alert(json.error || 'No se pudo guardar el vehículo.'); return; }
+    document.getElementById('v-marca').value  = '';
+    document.getElementById('v-modelo').value = '';
+    document.getElementById('v-cap').value    = '';
+    renderVehiculos();
+  } catch {
+    alert('Error de conexión con el servidor.');
+  }
 }
 
-function eliminarVehiculo(id) {
-  if (!confirm('¿Eliminar este vehículo?')) return;
-  setMock('vehiculos', getMock('vehiculos').filter(v=>v.id!==id));
-  renderVehiculos();
+async function eliminarVehiculo(id) {
+  if (!confirm(I18N.autoT('¿Eliminar este vehículo?'))) return;
+  try {
+    const res  = await fetch(`/api/vehiculos.php?id=${id}`, { method: 'DELETE' });
+    const json = await res.json();
+    if (!json.ok) { alert(json.error || 'No se pudo eliminar.'); return; }
+    renderVehiculos();
+  } catch {
+    alert('Error de conexión con el servidor.');
+  }
 }
 
 /* Mis cargadores */
-function renderMisCargadores() {
-  const lista = getMock('cargadores').filter(c=>c.propietario_id===U.id);
+async function renderMisCargadores() {
   const el = document.getElementById('lista-mis-cargadores');
   const badgeMap = {disponible:'badge-green',ocupado:'badge-orange',sin_servicio:'badge-gray'};
+  const lista = await fetch('/api/estaciones.php').then(r=>r.json()).then(j=>j.ok?j.data.filter(c=>c.propietario_id===U.id):[]).catch(()=>[]);
   el.innerHTML = lista.length ? `
     <table class="data-table">
       <thead><tr><th>Nombre</th><th>Estado</th><th>Potencia</th><th></th></tr></thead>
       <tbody>
         ${lista.map(c=>`<tr>
-          <td>${c.nombre}</td>
+          <td>${escapeHtml(c.nombre)}</td>
           <td><span class="badge ${badgeMap[c.estado]}">${c.estado}</span></td>
-          <td>${Math.max(...c.conectores.map(x=>x.potencia))} kW</td>
+          <td>${c.conectores.length ? Math.max(...c.conectores.map(x=>x.potencia)) : '—'} kW</td>
           <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
         </tr>`).join('')}
       </tbody>
     </table>` : '<p style="font-size:.88rem;color:var(--soft)">No tenés cargadores registrados.</p>';
+  I18N.apply(false);
 }
 
 /* Historial */
-function renderHistorial() {
-  const trans = getMock('transacciones').filter(t=>t.usuario_id===U.id);
+async function renderHistorial() {
   const el = document.getElementById('lista-trans');
+  const trans = await fetch('/api/reservas.php').then(r=>r.json()).then(j=>j.ok?j.data:[]).catch(()=>[]);
   el.innerHTML = trans.length ? `
     <table class="data-table">
       <thead><tr><th>Recibo</th><th>Cargador</th><th>kWh</th><th>Total</th><th>Fecha</th></tr></thead>
       <tbody>
-        ${trans.map(t=>{
-          const c = getCargador(t.cargador_id);
-          return `<tr>
-            <td style="font-family:monospace;font-size:.8rem">${t.recibo}</td>
-            <td>${c?.nombre||'—'}</td>
+        ${trans.map(t=>`<tr>
+            <td style="font-family:monospace;font-size:.8rem">${escapeHtml(t.recibo)}</td>
+            <td>${escapeHtml(t.cargador_nombre)||'—'}</td>
             <td>${t.kwh||'—'}</td>
             <td>${t.monto_total>0?'$'+t.monto_total+' UYU':'Gratis'}</td>
             <td>${t.fecha}</td>
-          </tr>`;
-        }).join('')}
+          </tr>`).join('')}
       </tbody>
     </table>` : `<div class="empty-state">
         <div class="empty-state__icon">${ICONS.clock(44)}</div>
         <div class="empty-state__title">Sin historial</div>
         <div class="empty-state__body">Tus recargas aparecerán acá una vez que realices tu primera reserva.</div>
       </div>`;
+  I18N.apply(false);
 }
 
 function logout() {

@@ -95,8 +95,7 @@ try {
         echo json_encode(['ok' => true]);
 
     } else {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Método no permitido.']);
+        http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']);
     }
 
 } catch (Exception $e) {

@@ -93,7 +93,9 @@
 
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/report-types.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script>
 requireAdmin();
 
@@ -177,6 +179,8 @@ function renderStats(s) {
       <span style="width:10px;height:10px;border-radius:2px;background:${colores[i]};display:inline-block"></span>
       ${n}: <strong>${vals[i]}</strong>
     </div>`).join('');
+
+  I18N.apply(false);
 }
 
 /* ── Reseñas pendientes ─────────────────────────────────────── */
@@ -187,12 +191,12 @@ function renderResenas() {
     <div class="table-wrap"><table class="data-table">
       <thead><tr><th>Usuario</th><th>Cargador</th><th>Estrellas</th><th>Comentario</th><th>Acciones</th></tr></thead>
       <tbody>${pend.map(r=>`<tr>
-        <td>${r.usuario_nombre}</td>
-        <td>${r.cargador_nombre}</td>
+        <td>${escapeHtml(r.usuario_nombre)}</td>
+        <td>${escapeHtml(r.cargador_nombre)}</td>
         <td><span style="display:inline-flex;align-items:center;gap:1px">
           ${Array.from({length:5},(_,i)=>`<span style="color:${i<r.estrellas?'#F5B800':'#C8D3DF'}">${solSVG(14)}</span>`).join('')}
         </span></td>
-        <td style="font-size:.82rem">${r.texto || ''}</td>
+        <td style="font-size:.82rem">${escapeHtml(r.texto)}</td>
         <td style="white-space:nowrap">
           <button class="btn btn--green btn--sm" onclick="modResena(${r.id},'aprobada')">${ICONS.checkCircle(14)} Aprobar</button>
           <button class="btn btn--warn btn--sm"  onclick="modResena(${r.id},'rechazada')">${ICONS.xCircle(14)} Rechazar</button>
@@ -200,6 +204,7 @@ function renderResenas() {
       </tr>`).join('')}</tbody>
     </table></div>`
     : '<p style="font-size:.88rem;color:var(--soft)">Sin reseñas pendientes. ✓</p>';
+  I18N.apply(false);
 }
 
 async function modResena(id, estado) {
@@ -216,12 +221,6 @@ async function modResena(id, estado) {
 }
 
 /* ── Reportes abiertos ──────────────────────────────────────── */
-const tipoReporteLabel = {
-  fuera_servicio: 'Fuera de servicio',
-  vandalismo: 'Vandalismo',
-  informacion_incorrecta: 'Información incorrecta',
-  otro: 'Otro',
-};
 function renderReportes() {
   const pend = reportes.filter(r => !+r.resuelto);
   const el   = document.getElementById('lista-reportes');
@@ -233,10 +232,10 @@ function renderReportes() {
         return `<tr>
         <td>${huerfano
             ? `<span style="color:var(--soft)" title="El cargador ya no existe en la base">Cargador #${r.punto_carga_id} (eliminado)</span>`
-            : `<a href="cargador.html?id=${r.punto_carga_id}">${r.punto_carga_nombre}</a>`}</td>
-        <td>${tipoReporteLabel[r.tipo] || r.tipo}</td>
-        <td style="font-size:.82rem">${r.descripcion || '—'}</td>
-        <td>${r.usuario_nombre || '—'}</td>
+            : `<a href="cargador.html?id=${r.punto_carga_id}">${escapeHtml(r.punto_carga_nombre)}</a>`}</td>
+        <td>${REPORT_TIPOS[r.tipo] || r.tipo}</td>
+        <td style="font-size:.82rem">${escapeHtml(r.descripcion) || '—'}</td>
+        <td>${escapeHtml(r.usuario_nombre) || '—'}</td>
         <td>${r.creado_en ? r.creado_en.slice(0,10) : ''}</td>
         <td>
           ${huerfano ? '—' : `
@@ -252,6 +251,7 @@ function renderReportes() {
       }).join('')}</tbody>
     </table></div>`
     : '<p style="font-size:.88rem;color:var(--soft)">Sin reportes pendientes. ✓</p>';
+  I18N.apply(false);
 }
 
 async function resolverReporte(id, puntoCargaId) {
@@ -289,13 +289,14 @@ function renderCargadores(lista) {
   document.getElementById('tbody-cargadores').innerHTML = lista.map(c=>{
     const tipos = [...new Set((c.conectores||[]).map(x=>x.tipo))].join(', ') || '—';
     return `<tr>
-    <td><a href="cargador.html?id=${c.id}">${c.nombre}</a> ${c.fuente==='ute' ? '<span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem">UTE</span>' : ''}</td>
+    <td><a href="cargador.html?id=${c.id}">${escapeHtml(c.nombre)}</a> ${c.fuente==='ute' ? '<span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem">UTE</span>' : ''}</td>
     <td style="font-size:.82rem;color:var(--soft)">${c.acceso || ''}</td>
     <td><span class="badge ${badgeMap[c.estado]||''}">${c.estado}</span></td>
     <td style="font-size:.82rem">${tipos}</td>
     <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
   </tr>`;
   }).join('');
+  I18N.apply(false);
 }
 
 /* ── Sincronización manual de cargadores UTE ─────────────────── */
@@ -326,6 +327,39 @@ async function sincronizarUTE() {
   btn.disabled = false;
   btn.innerHTML = 'Actualizar cargadores UTE';
 }
+
+/* ── Sidebar: resaltar el link de la sección visible ─────────── */
+(function () {
+  const links = document.querySelectorAll('.admin-sidebar .sidebar-link[href^="admin.html"]');
+
+  function marcarActivo(id) {
+    links.forEach(l => {
+      const linkId = l.getAttribute('href').split('#')[1] || '';
+      l.classList.toggle('active', (id || '') === linkId);
+    });
+  }
+
+  links.forEach(l => l.addEventListener('click', () => {
+    marcarActivo(l.getAttribute('href').split('#')[1] || null);
+  }));
+
+  const secciones = ['cargadores', 'resenas', 'reportes']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+
+  if ('IntersectionObserver' in window && secciones.length) {
+    const obs = new IntersectionObserver(entries => {
+      const visible = entries
+        .filter(e => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) marcarActivo(visible.target.id);
+      else if (window.scrollY < 100) marcarActivo(null);
+    }, { rootMargin: '-70px 0px -60% 0px', threshold: [0, 0.25, 0.5] });
+    secciones.forEach(s => obs.observe(s));
+  }
+
+  if (location.hash) marcarActivo(location.hash.slice(1));
+})();
 
 /* ── Init ─────────────────────────────────────────────────────── */
 initDashboard();

@@ -15,9 +15,7 @@ session_start();
 require_once '../includes/db.php';
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['ok' => false, 'error' => 'Método no permitido']); exit;
-}
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido']); exit; }
 
 $data = json_decode(file_get_contents('php://input'), true);
 $email = trim($data['email'] ?? '');
@@ -31,11 +29,11 @@ $pdo = db_connect();
 
 /* ── Rate limiting: máx. 5 intentos fallidos en 15 minutos por IP+email ── */
 function obtener_ip_real() {
+    /* CF-Connecting-IP lo pone el edge de Cloudflare y no se puede spoofear
+       en el camino público (túnel). X-Forwarded-For, en cambio, lo puede
+       fijar cualquier cliente que le pegue directo a la VM (red local),
+       así que no se usa como fuente del rate limit. */
     if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) return $_SERVER['HTTP_CF_CONNECTING_IP'];
-    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $partes = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-        return trim($partes[0]);
-    }
     return $_SERVER['REMOTE_ADDR'] ?? 'desconocida';
 }
 
@@ -72,7 +70,7 @@ if ($intento) {
     }
 }
 
-$stmt = $pdo->prepare("SELECT id, nombre, password_hash, rol_id, activo FROM usuarios WHERE email = ?");
+$stmt = $pdo->prepare("SELECT id, nombre, email, password_hash, ci_rut, empresa, rol_id, activo FROM usuarios WHERE email = ?");
 $stmt->execute([$email]);
 $user = $stmt->fetch();
 
@@ -95,7 +93,10 @@ $_SESSION['nombre']     = $user['nombre'];
 $_SESSION['rol_id']     = $user['rol_id'];
 
 echo json_encode(['ok' => true, 'data' => [
-    'id'     => $user['id'],
-    'nombre' => $user['nombre'],
-    'rol_id' => $user['rol_id'],
+    'id'      => $user['id'],
+    'nombre'  => $user['nombre'],
+    'email'   => $user['email'],
+    'ci_rut'  => $user['ci_rut'],
+    'empresa' => $user['empresa'],
+    'rol_id'  => $user['rol_id'],
 ]]);

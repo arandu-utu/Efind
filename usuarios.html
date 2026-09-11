@@ -67,7 +67,7 @@
       </div>
       <div id="sin-resultados" style="display:none">
         <div class="empty-state">
-          <div class="empty-state__icon">${ICONS ? ICONS.users(40) : ''}</div>
+          <div class="empty-state__icon" id="icon-sin-usuarios"></div>
           <div class="empty-state__title">Sin usuarios</div>
           <div class="empty-state__body">No hay usuarios que coincidan con el filtro aplicado.</div>
         </div>
@@ -79,10 +79,12 @@
 <footer class="site-footer" id="footer"></footer>
 
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script>
 requireAdmin();
 const ME = Auth.get();
+document.getElementById('icon-sin-usuarios').innerHTML = ICONS.users(40);
 
 /* rol_id: 1=admin, 2=particular, 3=propietario */
 const ROLES_LABEL = { 1:'Admin', 2:'Particular', 3:'Propietario' };
@@ -130,10 +132,10 @@ function renderTabla() {
           <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);
                       display:flex;align-items:center;justify-content:center;
                       font-size:.82rem;font-weight:900;color:#fff;flex-shrink:0">${inicial}</div>
-          <div style="font-weight:700;font-size:.88rem">${u.nombre}</div>
+          <div style="font-weight:700;font-size:.88rem">${escapeHtml(u.nombre)}</div>
         </div>
       </td>
-      <td style="font-size:.85rem">${u.email}</td>
+      <td style="font-size:.85rem">${escapeHtml(u.email)}</td>
       <td><span class="badge ${ROLES_BADGE[u.rol_id]||'badge-blue'}">${ROLES_LABEL[u.rol_id]||'Rol '+u.rol_id}</span></td>
       <td style="font-size:.82rem;color:var(--soft)">${fecha}</td>
       <td><span class="badge ${+u.activo ? 'badge-green' : 'badge-gray'}">${+u.activo ? 'Activo' : 'Suspendido'}</span></td>

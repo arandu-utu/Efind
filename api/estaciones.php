@@ -11,18 +11,28 @@ try {
     $db    = db_connect();
     $limit = isset($_GET['limit']) ? min((int)$_GET['limit'], 1000) : 500;
 
+    /* LIMIT se aplica sobre estaciones distintas (subquery), no sobre las
+       filas planas estación×conector del join de abajo — si se aplicara
+       después del join, una estación con varios conectores podía consumir
+       el límite ella sola y truncar tanto la cantidad de estaciones
+       devueltas como los conectores de la última estación incluida. */
     $rows = $db->query("
         SELECT p.id, p.nombre, p.descripcion, p.direccion, p.ciudad, p.departamento,
                p.lat, p.lng, p.acceso, p.estado, p.fuente, p.horario, p.costo_kwh,
                p.propietario_id,
                c.id AS conector_id, c.tipo_conector_id, c.potencia_kw, c.estado AS conector_estado,
                t.nombre AS conector_nombre
-        FROM   puntos_carga p
+        FROM (
+            SELECT id, nombre, descripcion, direccion, ciudad, departamento,
+                   lat, lng, acceso, estado, fuente, horario, costo_kwh, propietario_id
+            FROM   puntos_carga
+            WHERE  activo = 1
+            ORDER  BY id DESC
+            LIMIT  $limit
+        ) p
         LEFT JOIN conectores     c ON c.punto_carga_id  = p.id
         LEFT JOIN tipos_conector t ON t.id              = c.tipo_conector_id
-        WHERE  p.activo = 1
         ORDER  BY p.id DESC
-        LIMIT  $limit
     ")->fetchAll(PDO::FETCH_ASSOC);
 
     /* Agrupar filas planas en estaciones con array de conectores */

@@ -81,6 +81,29 @@ button { cursor: pointer; font-family: inherit; }
   text-decoration: none;
 }
 
+/* Selector de idioma */
+.lang-toggle {
+  display: flex;
+  gap: .2rem;
+  margin-left: .3rem;
+  padding: .15rem;
+  background: rgba(255,255,255,.08);
+  border-radius: var(--radius);
+}
+.lang-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255,255,255,.65);
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .25rem .5rem;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.lang-btn:hover { color: #fff; }
+.lang-btn.active { background: var(--accent); color: #fff; }
+
 /* Zona de usuario */
 .navbar__user { position: relative; }
 .user-chip {
@@ -391,6 +414,11 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
   width: 210px; flex-shrink: 0;
   background: var(--nav);
   padding: 1.5rem 0;
+  position: sticky;
+  top: 60px; /* alto de .navbar, que también es sticky */
+  align-self: flex-start;
+  height: calc(100vh - 60px); /* alto fijo de viewport, no del contenido */
+  overflow-y: auto;
 }
 .sidebar-section {
   font-size: .7rem; font-weight: 800;

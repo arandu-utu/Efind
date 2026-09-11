@@ -1,6 +1,6 @@
 /**
- * E-Find — Simulación de autenticación
- * Lee/escribe en localStorage. No hay backend real.
+ * E-Find — Sesión de usuario (login/registro reales vía API; esto solo
+ * lee/escribe la copia en localStorage que usa la navbar).
  */
 
 const Auth = {
@@ -10,38 +10,6 @@ const Auth = {
   get() {
     const raw = localStorage.getItem(this.KEY);
     return raw ? JSON.parse(raw) : null;
-  },
-
-  /* Iniciar sesión con email + contraseña (contraseña ignorada en mock) */
-  login(email, _password) {
-    const usuarios = getMock('usuarios');
-    const u = usuarios.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!u) return { ok: false, error: 'Email no encontrado.' };
-    if (!u.activo) return { ok: false, error: 'Usuario suspendido.' };
-    localStorage.setItem(this.KEY, JSON.stringify(u));
-    return { ok: true, usuario: u };
-  },
-
-  /* Registrar nuevo usuario */
-  register(datos) {
-    const usuarios = getMock('usuarios');
-    if (usuarios.find(u => u.email === datos.email))
-      return { ok: false, error: 'El email ya está registrado.' };
-
-    const nuevo = {
-      id: Date.now(),
-      nombre: datos.nombre,
-      email: datos.email,
-      rol: datos.rol || 'particular',
-      ci_rut: datos.ci_rut.replace(/[.\-\s]/g, ''),
-      avatar: datos.nombre[0].toUpperCase(),
-      activo: true,
-      empresa: datos.empresa || null,
-    };
-    usuarios.push(nuevo);
-    setMock('usuarios', usuarios);
-    localStorage.setItem(this.KEY, JSON.stringify(nuevo));
-    return { ok: true, usuario: nuevo };
   },
 
   logout() {
@@ -66,6 +34,13 @@ const Auth = {
   },
 };
 
+/* ── Escapar HTML antes de insertar texto de usuario con innerHTML ──── */
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str ?? '';
+  return d.innerHTML;
+}
+
 /* ── Validaciones uruguayas ──────────────────────────────────── */
 function validarCI(ci) {
   ci = ci.replace(/[.\-\s]/g, '').padStart(8, '0');
@@ -88,32 +63,41 @@ function renderNavbar() {
   const nav = document.getElementById('navbar');
   if (!nav) return;
 
+  const t = (k) => I18N.t(k);
+  const lang = I18N.get();
+  const langToggle = `
+    <div class="lang-toggle">
+      <button class="lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es" onclick="I18N.set('es')">ES</button>
+      <button class="lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en" onclick="I18N.set('en')">EN</button>
+    </div>`;
+
   nav.innerHTML = `
     <div class="navbar__inner">
       <a href="index.html" class="nav-logo">
         <img src="img/efind-nav.png" alt="E-Find" height="38" style="display:block">
       </a>
       <div class="navbar__links">
-        <a href="index.html" class="nav-link" id="nl-mapa">Mapa</a>
-        ${isAdmin ? '<a href="admin.html" class="nav-link" id="nl-admin">Panel Admin</a>' : ''}
+        <a href="index.html" class="nav-link" id="nl-mapa">${t('nav_mapa')}</a>
+        ${isAdmin ? `<a href="admin.html" class="nav-link" id="nl-admin">${t('nav_admin')}</a>` : ''}
         ${u ? `
-          <a href="agregar.html" class="btn btn--green btn--sm">+ Agregar</a>
+          <a href="agregar.html" class="btn btn--green btn--sm">${t('nav_agregar')}</a>
           <div class="navbar__user" id="user-menu">
             <div class="user-chip">
               <div class="avatar">${u.avatar || u.nombre[0].toUpperCase()}</div>
               ${u.nombre.split(' ')[0]}
             </div>
             <div class="dropdown">
-              <a href="perfil.html">${ICONS.user(15)} Mi perfil</a>
-              ${isAdmin ? `<a href="admin.html">${ICONS.settings(15)} Administración</a>` : ''}
+              <a href="perfil.html">${ICONS.user(15)} ${t('nav_perfil')}</a>
+              ${isAdmin ? `<a href="admin.html">${ICONS.settings(15)} ${t('nav_administracion')}</a>` : ''}
               <div class="sep"></div>
-              <button onclick="Auth.logout(); location.href='login.html'">${ICONS.logout(15)} Cerrar sesión</button>
+              <button onclick="Auth.logout(); location.href='login.html'">${ICONS.logout(15)} ${t('nav_logout')}</button>
             </div>
           </div>
         ` : `
-          <a href="login.html"    class="btn btn--outline-nav btn--sm">Iniciar sesión</a>
-          <a href="registro.html" class="btn btn--primary btn--sm">Registrarse</a>
+          <a href="login.html"    class="btn btn--outline-nav btn--sm">${t('nav_login')}</a>
+          <a href="registro.html" class="btn btn--primary btn--sm">${t('nav_registro')}</a>
         `}
+        ${langToggle}
       </div>
     </div>
   `;
@@ -123,20 +107,23 @@ function renderNavbar() {
   const linkMap = { 'index.html': 'nl-mapa', 'admin.html': 'nl-admin' };
   const active = document.getElementById(linkMap[page]);
   if (active) active.classList.add('active');
+
+  wireUserMenu();
 }
 
 function renderFooter() {
   const f = document.getElementById('footer');
   if (!f) return;
+  const t = (k) => I18N.t(k);
   f.innerHTML = `
     <div class="footer-inner">
       <div class="footer-brand">
         <img src="img/efind-nav.png" alt="E-Find" height="28">
-        <span style="color:rgba(255,255,255,.55);font-size:.8rem">Cargadores VE en Uruguay</span>
+        <span style="color:rgba(255,255,255,.55);font-size:.8rem">${t('footer_tagline')}</span>
       </div>
-      <span style="color:rgba(255,255,255,.4);font-size:.8rem">Proyecto de egreso &copy; 2026</span>
+      <span style="color:rgba(255,255,255,.4);font-size:.8rem">${t('footer_proyecto')}</span>
       <div class="footer-brand">
-        <span style="color:rgba(255,255,255,.4);font-size:.75rem">Desarrollado por</span>
+        <span style="color:rgba(255,255,255,.4);font-size:.75rem">${t('footer_dev')}</span>
         <img src="img/arandu-dark.png" alt="Arandú" height="28">
       </div>
     </div>
@@ -168,30 +155,32 @@ function requireAdmin(redirectTo = 'index.html') {
 document.addEventListener('DOMContentLoaded', () => {
   renderNavbar();
   renderFooter();
-  wireUserMenu();
 });
 
+/* Se llama cada vez que renderNavbar() reconstruye el navbar (carga inicial
+   y cambio de idioma), porque el chip/dropdown son elementos nuevos cada vez
+   y pierden los listeners anteriores. El listener de "click afuera" se
+   engancha en document una sola vez (buscando .user-menu en el momento del
+   click) para no ir acumulando uno por cada reconstrucción. */
 function wireUserMenu() {
   const menu = document.getElementById('user-menu');
   if (!menu) return;
 
   const chip = menu.querySelector('.user-chip');
-  if (!chip) return;
+  if (chip) {
+    chip.onclick = (e) => {
+      e.stopPropagation();
+      menu.classList.toggle('open');
+    };
+  }
 
-  // Toggle on chip click
-  chip.addEventListener('click', (e) => {
-    e.stopPropagation();
-    menu.classList.toggle('open');
-  });
-
-  // Close when clicking anywhere outside
-  document.addEventListener('click', () => {
-    menu.classList.remove('open');
-  });
-
-  // Prevent clicks inside dropdown from closing it
   const dropdown = menu.querySelector('.dropdown');
-  if (dropdown) {
-    dropdown.addEventListener('click', (e) => e.stopPropagation());
+  if (dropdown) dropdown.onclick = (e) => e.stopPropagation();
+
+  if (!window.__userMenuOutsideClickWired) {
+    window.__userMenuOutsideClickWired = true;
+    document.addEventListener('click', () => {
+      document.getElementById('user-menu')?.classList.remove('open');
+    });
   }
 }

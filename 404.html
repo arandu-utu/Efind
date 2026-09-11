@@ -39,20 +39,20 @@
       ">404</span>
     </div>
 
-    <h1 style="font-size:1.6rem;font-weight:900;color:var(--nav);margin-bottom:.5rem">
+    <h1 style="font-size:1.6rem;font-weight:900;color:var(--nav);margin-bottom:.5rem" data-i18n="p404_title">
       Cargador no encontrado
     </h1>
     <p style="font-size:.95rem;color:var(--soft);line-height:1.6;margin-bottom:2rem">
-      La página que buscas no existe o fue movida.<br>
-      Pero seguro hay un cargador cerca de vos.
+      <span data-i18n="p404_line1">La página que buscas no existe o fue movida.</span><br>
+      <span data-i18n="p404_line2">Pero seguro hay un cargador cerca de vos.</span>
     </p>
 
     <div style="display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap">
       <a href="index.html" class="btn btn--primary">
-        <span data-icon="globe" data-size="15"></span> Ir al mapa
+        <span data-icon="globe" data-size="15"></span> <span data-i18n="p404_irmapa">Ir al mapa</span>
       </a>
       <button class="btn btn--outline" onclick="history.back()">
-        ← Volver
+        ← <span data-i18n="p404_volver">Volver</span>
       </button>
     </div>
 
@@ -61,8 +61,8 @@
 
 <footer class="site-footer" id="footer"></footer>
 
-<script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 </body>
 </html>

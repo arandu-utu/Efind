@@ -17,11 +17,7 @@ try {
     $db     = db_connect();
     $method = $_SERVER['REQUEST_METHOD'];
 
-    if ($method !== 'PATCH' && $method !== 'PUT') {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Método no permitido.']);
-        exit;
-    }
+    if ($method !== 'PATCH' && $method !== 'PUT') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']); exit; }
 
     requiere_login();
 

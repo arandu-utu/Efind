@@ -115,7 +115,6 @@
   <!-- COMPROBANTE -->
   <div id="panel-recibo" class="card" style="display:none;text-align:center">
     <div style="margin-bottom:1.25rem" id="reserved-check-icon"></div>
-    <script>document.getElementById("reserved-check-icon").innerHTML = ICONS.reservedCheck(64);</script>
     <h2 style="color:var(--nav);margin-bottom:.4rem">¡Carga reservada!</h2>
     <p style="color:var(--soft);margin-bottom:1.25rem">Recibo de transacción</p>
     <div style="background:var(--bg);border-radius:var(--radius);padding:1rem;text-align:left;margin-bottom:1.25rem;font-size:.88rem">
@@ -149,7 +148,8 @@
 
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script>
   /* ── Calificación post-pago ─────────────────────────────────── */
   let _puntos = 0;
@@ -186,27 +186,17 @@
     });
   }
 
-  function enviarCalificacion() {
-    if (_puntos === 0) { alert('Seleccioná una puntuación antes de enviar.'); return; }
-    const tx = getMock('transacciones').find(t => t.id === window._txId);
-    if (!tx) return;
-    const propietario_id = tx.propietario_id;
-    const cals = getMock('calificaciones');
-    cals.push({
-      id: Date.now(),
-      de_usuario_id: U.id,
-      para_usuario_id: propietario_id,
-      transaccion_id: tx.id,
-      puntos: _puntos,
-      comentario: document.getElementById('rating-comentario').value.trim(),
-      fecha: new Date().toISOString().slice(0, 10),
-      tipo: 'cliente_a_propietario',
-    });
-    setMock('calificaciones', cals);
-    recalcularCalificacion(propietario_id);
-    const trans = getMock('transacciones');
-    const idx = trans.findIndex(t => t.id === window._txId);
-    if (idx !== -1) { trans[idx].calificado = true; setMock('transacciones', trans); }
+  async function enviarCalificacion() {
+    if (_puntos === 0) { alert(I18N.autoT('Seleccioná una puntuación antes de enviar.')); return; }
+    if (!window._txPropietarioId) return;
+    await fetch('/api/calificaciones.php', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        para_usuario_id: window._txPropietarioId, transaccion_id: window._txId,
+        puntos: _puntos, comentario: document.getElementById('rating-comentario').value.trim(),
+      }),
+    }).catch(()=>{});
+    fetch('/api/reservas.php', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: window._txId }) }).catch(()=>{});
     document.getElementById('rating-section').innerHTML =
       '<p style="color:var(--green);font-weight:600;text-align:center;padding:.75rem">✓ ¡Gracias por tu calificación!</p>';
   }
@@ -216,28 +206,35 @@
 requireAuth();
 const U = Auth.get();
 const ID = +cargadorIdFromURL();
-const C  = getCargador(ID);
+let C = null, calcActual = null;
 
-let calcActual = null;
+(async () => {
+  try {
+    const r = await fetch(`/api/estacion.php?id=${ID}`).then(r => r.json());
+    if (!r.ok) { location.href = 'index.html'; return; }
+    C = {
+      id: r.data.id, nombre: r.data.nombre, direccion: r.data.direccion || 'Sin dirección registrada',
+      horario: r.data.horario || 'No especificado', costo_kwh: +r.data.costo_kwh || 0,
+      propietario_id: r.data.propietario_id,
+      conectores: (r.data.conectores || []).map(c => ({ tipo: c.tipo, potencia: parseFloat(c.potencia_kw) })),
+    };
+    await init();
+  } catch { location.href = 'index.html'; }
+})();
 
-if (!C) { location.href = 'index.html'; }
-else init();
-
-function init() {
+async function init() {
   document.getElementById('bread-nombre').textContent = C.nombre;
 
-  /* Resumen cargador */
   document.getElementById('resumen-cargador').innerHTML = `
-    <strong>${C.nombre}</strong> &nbsp;·&nbsp; ${C.direccion}<br>
-    <span style="color:var(--soft)">${C.horario} &nbsp;·&nbsp; ${C.costo_kwh ? '$'+C.costo_kwh+'/kWh' : 'Gratuito'}</span>`;
+    <strong>${escapeHtml(C.nombre)}</strong> &nbsp;·&nbsp; ${escapeHtml(C.direccion)}<br>
+    <span style="color:var(--soft)">${escapeHtml(C.horario)} &nbsp;·&nbsp; ${C.costo_kwh ? '$'+C.costo_kwh+'/kWh' : 'Gratuito'}</span>`;
 
   /* Vehículos del usuario */
-  const sel = document.getElementById('sel-vehiculo');
-  const vehs = getMock('vehiculos').filter(v => v.usuario_id === U.id);
+  const sel  = document.getElementById('sel-vehiculo');
+  const vehs = await fetch('/api/vehiculos.php').then(r => r.json()).then(j => j.ok ? j.data : []).catch(() => []);
   vehs.forEach(v => {
     const o = document.createElement('option');
     o.value = v.capacidad_kwh;
-    o.dataset.cap = v.capacidad_kwh;
     o.textContent = `${v.marca} ${v.modelo} (${v.capacidad_kwh} kWh)`;
     sel.appendChild(o);
   });
@@ -252,6 +249,7 @@ function init() {
   });
 
   recalcular();
+  I18N.apply(false);
 }
 
 function recalcular() {
@@ -266,7 +264,7 @@ function recalcular() {
   const comision = subtotal * 0.10;
   const total    = subtotal;
 
-  calcActual = { kwh, tiempo: r.texto, subtotal, comision, total };
+  calcActual = { cap, soc, pot, kwh, tiempo: r.texto, subtotal, comision, total };
 
   document.getElementById('c-kwh').textContent     = kwh + ' kWh';
   document.getElementById('c-tiempo').textContent  = r.texto;
@@ -279,14 +277,7 @@ function recalcular() {
 function irPago() {
   document.getElementById('panel-reserva').style.display = 'none';
   document.getElementById('panel-pago').style.display    = '';
-  if (!C.costo_kwh) {
-    /* Gratuito: saltar pago directamente */
-    confirmarGratis();
-  }
-}
-
-function confirmarGratis() {
-  emitirRecibo('gratuita', '0');
+  if (!C.costo_kwh) pagar(); /* Gratuito: saltar directo al pago (queda en $0) */
 }
 
 function volverReserva() {
@@ -318,35 +309,41 @@ function procesarPago() {
   const btn = document.getElementById('btn-pagar');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Procesando…';
-
-  setTimeout(() => emitirRecibo(nom, calcActual?.total ?? 0), 1500);
+  setTimeout(pagar, 1500); /* simula latencia de pasarela de pago */
 }
 
-function emitirRecibo(titular, total) {
-  const nro = 'EF-' + Date.now();
-  const trans = getMock('transacciones');
-  const nuevaTx = {
-    id: Date.now(), usuario_id: U.id, cargador_id: C.id,
-    propietario_id: C.propietario_id,
-    duracion_h: +(calcActual?.tiempo.replace(/[^\d.]/g,'')),
-    kwh: calcActual?.kwh, monto_total: +total,
-    comision: calcActual?.comision, fecha: new Date().toISOString().slice(0,10),
-    recibo: nro, calificado: false,
-  };
-  trans.push(nuevaTx);
-  setMock('transacciones', trans);
-  window._txId = nuevaTx.id;
+async function pagar() {
+  const res = await fetch('/api/pagos.php', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ punto_carga_id: C.id, capacidad_kwh: calcActual.cap, soc_pct: calcActual.soc, potencia_kw: calcActual.pot }),
+  }).then(r => r.json()).catch(() => ({ ok:false }));
 
-  document.getElementById('panel-pago').style.display    = 'none';
-  document.getElementById('panel-recibo').style.display  = '';
+  if (!res.ok) {
+    const al = document.getElementById('pago-alert');
+    al.className = 'alert alert-error';
+    al.innerHTML = res.error || 'No se pudo procesar el pago.';
+    al.style.display = 'flex';
+    const btn = document.getElementById('btn-pagar');
+    btn.disabled = false; btn.textContent = 'Confirmar y pagar';
+    return;
+  }
+
+  window._txId = res.data.id;
+  window._txPropietarioId = res.data.propietario_id;
+
+  document.getElementById('panel-pago').style.display   = 'none';
+  document.getElementById('panel-recibo').style.display = '';
+  document.getElementById('reserved-check-icon').innerHTML = ICONS.reservedCheck(64);
   initSolPicker();
 
-  document.getElementById('r-nro').textContent    = nro;
-  document.getElementById('r-nombre').textContent = C.nombre;
-  document.getElementById('r-kwh').textContent    = calcActual?.kwh + ' kWh';
-  document.getElementById('r-tiempo').textContent = calcActual?.tiempo;
-  document.getElementById('r-total').textContent  = total > 0 ? `$${(+total).toFixed(0)} UYU` : 'Gratuito';
-  document.getElementById('r-prop').textContent   = total > 0 ? `$${(+total * 0.9).toFixed(0)} UYU` : '—';
+  const total = res.data.monto_total;
+  document.getElementById('r-nro').textContent    = res.data.recibo;
+  document.getElementById('r-nombre').textContent = res.data.cargador_nombre;
+  document.getElementById('r-kwh').textContent    = res.data.kwh + ' kWh';
+  document.getElementById('r-tiempo').textContent = res.data.tiempo;
+  document.getElementById('r-total').textContent  = total > 0 ? `$${total.toFixed(0)} UYU` : 'Gratuito';
+  document.getElementById('r-prop').textContent   = total > 0 ? `$${(total * 0.9).toFixed(0)} UYU` : '—';
+  I18N.apply(false);
 }
 </script>
 </body>

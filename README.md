@@ -34,28 +34,37 @@ Navegador  →  HTML/JS  →  /api/*.php  →  MariaDB
 
 | Endpoint | Métodos | Auth | Descripción |
 |---|---|---|---|
-| `/api/login.php` | POST | — | Inicio de sesión |
-| `/api/registro.php` | POST | — | Registro de usuario |
+| `/api/login.php` | POST | — | Inicio de sesión (rate limit por IP+email) |
+| `/api/registro.php` | POST | — | Registro de usuario (particular → rol 2, empresa → rol 3 propietario) |
+| `/api/logout.php` | GET | — | Cierre de sesión (solo en servidor) |
 | `/api/estaciones.php` | GET | — | Lista cargadores (público, con conectores) |
-| `/api/estacion.php` | GET | — | Detalle de un cargador |
+| `/api/estacion.php` | GET | — | Detalle de un cargador (solo en servidor) |
+| `/api/cargadores.php` | POST | Login | Alta de un cargador propio + sus conectores |
 | `/api/stats.php` | GET | Admin | KPIs del dashboard |
 | `/api/reportes.php` | GET / POST / PATCH | Login / Admin | Reportes de cargadores |
 | `/api/resenas.php` | GET / POST / PATCH | Login / Admin | Reseñas de cargadores |
 | `/api/usuarios.php` | GET / PATCH | Admin | Gestión de usuarios |
+| `/api/estado.php` | PATCH | Login | Estado del cargador en vivo (crowdsourced) |
+| `/api/cola.php` | PATCH | Login | Cola de espera en vivo (crowdsourced) |
+| `/api/ute-sync.php` | POST | Admin | Sincroniza cargadores públicos de UTE a la base propia |
+| `/api/vehiculos.php` | GET / POST / DELETE | Login | Vehículos propios del usuario |
+| `/api/reservas.php` | GET / PATCH | Login | Historial de transacciones propias |
+| `/api/pagos.php` | POST | Login | Procesa el pago simulado y emite el recibo |
+| `/api/calificaciones.php` | GET / POST | Login | Calificaciones entre usuarios (recibidas + nueva) |
 
 ## Funcionalidades
 
 | Módulo | Estado | Descripción |
 |---|---|---|
-| 🗺️ Mapa interactivo | ✅ Conectado a DB | Leaflet.js, cargadores reales, filtros por estado y tipo |
+| 🗺️ Mapa interactivo | ✅ Conectado a DB | Leaflet.js, cargadores reales + UTE, filtros por estado y tipo |
 | 🔐 Autenticación | ✅ PHP + sesiones | Registro, login, roles (particular, propietario, admin) |
 | 🛡️ Panel admin | ✅ API real | KPIs, gráfico mensual, donut de roles, moderación de reseñas y reportes |
 | 👥 Gestión de usuarios | ✅ API real | Lista, cambio de rol, suspensión/activación |
-| ⚡ Detalle de cargador | ✅ API real | Conectores, estado, reseñas |
+| ⚡ Detalle de cargador | ✅ API real | Conectores, estado, reseñas, reporte y estado/cola en vivo |
 | ⭐ Reseñas | ✅ API real | Creación y moderación (pendiente → aprobada/rechazada) |
 | 📢 Reportes | ✅ API real | Creación y resolución por admin |
-| 👤 Perfil de usuario | 🔧 En desarrollo | Historial, vehículos, cargadores propios |
-| 📅 Reservas | 🔧 En desarrollo | Estimador físico-matemático de tiempo y costo |
+| 👤 Perfil de usuario | ✅ API real | Datos personales, vehículos, cargadores propios, historial, calificaciones |
+| 📅 Reservas | ✅ API real | Estimador físico-matemático + pago simulado + calificación post-pago |
 
 ## Estructura del proyecto
 
@@ -64,46 +73,53 @@ efind-frontend/
 ├── index.html          # Mapa principal
 ├── login.html          # Autenticación
 ├── registro.html       # Registro de usuarios
-├── cargador.html       # Detalle de cargador (API real)
+├── cargador.html       # Detalle de cargador (API real, incluye modal de reporte)
 ├── reservar.html       # Flujo de reserva
 ├── agregar.html        # Alta de nuevo cargador
-├── reportar.html       # Reporte de problemas
 ├── perfil.html         # Perfil del usuario
 ├── admin.html          # Panel admin (API real)
 ├── usuarios.html       # Gestión de usuarios (API real)
 ├── api/
-│   ├── login.php
-│   ├── registro.php
-│   ├── estaciones.php
-│   ├── estacion.php
-│   ├── stats.php
-│   ├── reportes.php
-│   ├── resenas.php
-│   └── usuarios.php
-├── includes/           # En el servidor (fuera del repo)
+│   ├── login.php / registro.php* / logout.php*
+│   ├── estaciones.php / estacion.php* / cargadores.php
+│   ├── estado.php / cola.php          # crowdsourcing en vivo
+│   ├── reportes.php / resenas.php     # requieren moderación de admin
+│   ├── vehiculos.php / reservas.php / pagos.php / calificaciones.php
+│   ├── stats.php / usuarios.php       # panel admin
+│   └── ute-sync.php                   # sincronización manual con UTE
+├── includes/           # En el servidor (fuera del repo, gitignored)
 │   ├── db.php          # db_connect() + PDO
 │   └── auth.php        # requiere_login(), requiere_rol(), usuario_actual()
 ├── css/
 │   └── style.css       # Sistema de diseño completo
 ├── js/
-│   ├── auth.js         # Navbar/footer + Auth object (localStorage)
-│   ├── icons.js        # Set de íconos SVG custom
-│   ├── mock-data.js    # Datos mock legacy (en desuso progresivo)
-│   └── estimador.js    # Modelo físico de estimación de carga
+│   ├── auth.js          # Navbar/footer, Auth (sesión), escapeHtml()
+│   ├── i18n.js           # Toggle ES/EN
+│   ├── icons.js          # Set de íconos SVG custom
+│   ├── report-types.js   # Tipos de reporte (fuente única admin/cargador)
+│   ├── mock-data.js      # Solo utilidades: solSVG(), renderStars(), cargadorIdFromURL()
+│   └── estimador.js       # Modelo físico de estimación de carga
 └── img/                # Logos E-Find y Arandú
 ```
+\* Solo existen en el servidor, no en este checkout — ver "Local repo gaps" en `CLAUDE.md`.
 
 ## Esquema de base de datos (tablas principales)
 
 | Tabla | Descripción |
 |---|---|
-| `usuarios` | id, nombre, email, password_hash, rol_id, activo, creado_en |
-| `puntos_carga` | id, nombre, estado, acceso, lat, lng |
+| `usuarios` | id, nombre, email, password_hash, ci_rut, empresa, rol_id, activo, creado_en |
+| `puntos_carga` | id, nombre, estado, acceso, fuente, lat, lng, cola, propietario_id, costo_kwh |
 | `conectores` | id, punto_carga_id, tipo_conector_id, potencia_kw, estado |
 | `tipos_conector` | id, nombre (CCS2, CHAdeMO, Type 2, Schuko…), carga_rapida |
 | `resenas` | id, punto_carga_id, usuario_id, estrellas, texto, estado, fecha_creacion |
 | `reportes` | id, punto_carga_id, usuario_id, tipo, descripcion, resuelto, creado_en |
 | `roles` | id, nombre |
+| `vehiculos` | id, usuario_id, marca, modelo, capacidad_kwh, tipo_conector |
+| `transacciones` | id, usuario_id, punto_carga_id, propietario_id, recibo, kwh, monto_total, comision, calificado |
+| `calificaciones` | id, de_usuario_id, para_usuario_id, transaccion_id, puntos, comentario, tipo |
+| `login_intentos` | id, ip, email, intentos, ultimo_intento (rate limit de login) |
+
+Las últimas cuatro se auto-crean (`CREATE TABLE IF NOT EXISTS`) la primera vez que el endpoint correspondiente se usa — no requieren migración manual.
 
 ## Identidad visual
 

@@ -74,17 +74,13 @@
     <h3 class="modal__title">Reportar problema</h3>
     <div class="form-group" style="margin-bottom:.8rem">
       <label class="form-label">Tipo de problema</label>
-      <select id="tipo-reporte" class="form-select">
-        <option value="fuera_servicio">Fuera de servicio</option>
-        <option value="vandalismo">Vandalismo</option>
-        <option value="informacion_incorrecta">Información incorrecta (precio, conector, acceso)</option>
-        <option value="otro">Otro</option>
-      </select>
+      <select id="tipo-reporte" class="form-select"></select>
     </div>
     <div class="form-group" style="margin-bottom:.8rem">
       <label class="form-label">Descripción (opcional)</label>
       <textarea id="txt-reporte" class="form-textarea" placeholder="Describí el problema…"></textarea>
     </div>
+    <div id="reporte-alert" style="display:none;margin-bottom:.75rem"></div>
     <button class="btn btn--warn btn--full" onclick="enviarReporte()">Enviar reporte</button>
   </div>
 </div>
@@ -94,7 +90,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/report-types.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script src="js/estimador.js"></script>
 <script>
 /* ── Carga de datos desde la API real ───────────────────────── */
@@ -138,6 +136,10 @@ let C = null;   // se rellena con datos de la API
 
     await cargarResenas();
     renderPage();
+
+    /* Viene del botón "Reportar" del mapa (cargador.html?id=X&reportar=1):
+       abrir directo el modal. */
+    if (U && new URLSearchParams(location.search).get('reportar') === '1') abrirReporte();
 
   } catch (err) {
     console.error('Error cargando cargador:', err);
@@ -215,7 +217,7 @@ function renderPage() {
   document.getElementById('page-content').innerHTML = `
     <!-- Breadcrumb -->
     <div style="font-size:.8rem;color:var(--soft);margin-bottom:1rem">
-      <a href="index.html">Mapa</a> › ${C.nombre}
+      <a href="index.html">Mapa</a> › ${escapeHtml(C.nombre)}
     </div>
 
     <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
@@ -225,10 +227,10 @@ function renderPage() {
 
         <!-- Encabezado -->
         <div style="display:flex;align-items:flex-start;gap:.75rem;flex-wrap:wrap;margin-bottom:.5rem">
-          <h1 style="font-size:1.45rem;font-weight:900;color:var(--nav);flex:1">${C.nombre}</h1>
+          <h1 style="font-size:1.45rem;font-weight:900;color:var(--nav);flex:1">${escapeHtml(C.nombre)}</h1>
           <span class="badge ${badgeMap[C.estado]}">${labelMap[C.estado]}</span>
         </div>
-        <p style="color:var(--soft);font-size:.9rem;margin-bottom:1rem">${C.direccion}</p>
+        <p style="color:var(--soft);font-size:.9rem;margin-bottom:1rem">${escapeHtml(C.direccion)}</p>
 
         <!-- Cola -->
         <div style="font-size:.88rem;font-weight:600;color:${colaColor};margin-bottom:1.25rem">${colaText}</div>
@@ -237,7 +239,7 @@ function renderPage() {
         <div class="card" style="margin-bottom:1.25rem">
           <div class="card__title">Información técnica</div>
           <dl class="data-grid">
-            <dt>Horario</dt><dd>${C.horario}</dd>
+            <dt>Horario</dt><dd>${escapeHtml(C.horario)}</dd>
             <dt>Precio</dt><dd>${precio}</dd>
             <dt>Potencia máx.</dt><dd>${potMax} kW</dd>
             <dt>Tipo de acceso</dt><dd>${C.publica ? 'Público' : 'Privado / Alquiler'}</dd>
@@ -275,7 +277,7 @@ function renderPage() {
                   <span style="font-size:.78rem;color:var(--soft)">${r.fecha}</span>
                 </div>
                 <div class="stars-display" style="margin:.3rem 0">${stars(r.estrellas)}</div>
-                <p style="font-size:.85rem;color:var(--text)">${r.texto}</p>
+                <p style="font-size:.85rem;color:var(--text)">${escapeHtml(r.texto)}</p>
               </div>`).join('')}
           ` : `<p style="font-size:.88rem;color:var(--soft);margin-top:.75rem">Sin reseñas aún. ¡Sé el primero!</p>`}
         </div>
@@ -342,6 +344,8 @@ function renderPage() {
 
   /* Estimador — sin vehículos reales aún (próxima entrega) */
   montarEstimador(document.getElementById('estimador-widget'), C, []);
+
+  I18N.apply(false);
 }
 
 /* ── Modal reseña ──────────────────────────────────────────── */
@@ -398,11 +402,25 @@ async function enviarResena() {
 }
 
 /* ── Modal reporte ─────────────────────────────────────────── */
-function abrirReporte()  { document.getElementById('modal-reporte').style.display = 'flex'; }
+function abrirReporte() {
+  const sel = document.getElementById('tipo-reporte');
+  sel.innerHTML = `<option value="">${I18N.autoT('Seleccioná un tipo…')}</option>` +
+    Object.entries(REPORT_TIPOS).map(([v, label]) => `<option value="${v}">${I18N.autoT(label)}</option>`).join('');
+  document.getElementById('txt-reporte').value = '';
+  document.getElementById('reporte-alert').style.display = 'none';
+  document.getElementById('modal-reporte').style.display = 'flex';
+}
 function cerrarReporte() { document.getElementById('modal-reporte').style.display = 'none'; }
 
 async function enviarReporte() {
   const tipo = document.getElementById('tipo-reporte').value;
+  if (!tipo) {
+    const al = document.getElementById('reporte-alert');
+    al.className = 'alert alert-warn';
+    al.innerHTML = I18N.autoT('Seleccioná un tipo de problema.');
+    al.style.display = 'flex';
+    return;
+  }
   const desc = document.getElementById('txt-reporte').value;
   try {
     const res  = await fetch('/api/reportes.php', {

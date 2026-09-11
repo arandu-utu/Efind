@@ -53,11 +53,7 @@ function calcularEstadoEstacion($conectores) {
 try {
     $db = db_connect();
 
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['ok' => false, 'error' => 'Método no permitido.']);
-        exit;
-    }
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']); exit; }
 
     requiere_rol(1);
 
@@ -74,8 +70,6 @@ try {
     $creados = 0;
     $actualizados = 0;
     $omitidos = 0;
-
-    $stmtBuscar = $db->prepare("SELECT id FROM puntos_carga WHERE fuente = 'ute' AND nombre = :nombre LIMIT 1");
 
     $stmtInsert = $db->prepare("
         INSERT INTO puntos_carga
@@ -103,6 +97,14 @@ try {
         $tiposMap[$t['nombre']] = (int)$t['id'];
     }
 
+    /* Precargar estaciones UTE existentes (nombre -> id) para no hacer un
+       SELECT por estación dentro del foreach de abajo. */
+    $existentesStmt = $db->query("SELECT id, nombre FROM puntos_carga WHERE fuente = 'ute'");
+    $existentesMap  = [];
+    foreach ($existentesStmt->fetchAll(PDO::FETCH_ASSOC) as $e) {
+        $existentesMap[$e['nombre']] = (int)$e['id'];
+    }
+
     $db->beginTransaction();
 
     foreach ($json['data'] as $raw) {
@@ -112,11 +114,9 @@ try {
         $conectoresRaw = $raw['connectorStatusAcc'] ?? [];
         $estado = calcularEstadoEstacion($conectoresRaw);
 
-        $stmtBuscar->execute([':nombre' => $nombre]);
-        $existente = $stmtBuscar->fetch();
+        $puntoCargaId = $existentesMap[$nombre] ?? null;
 
-        if ($existente) {
-            $puntoCargaId = (int)$existente['id'];
+        if ($puntoCargaId !== null) {
             $stmtUpdate->execute([
                 ':direccion'    => $raw['address'] ?? '',
                 ':ciudad'       => $raw['city'] ?? null,

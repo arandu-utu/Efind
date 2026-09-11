@@ -138,9 +138,9 @@
 <footer class="site-footer" id="footer"></footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
 <script>
 requireAuth();
 
@@ -170,7 +170,7 @@ function buscarDir() {
   fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`)
     .then(r => r.json())
     .then(data => {
-      if (!data.length) { alert('Dirección no encontrada, hacé clic en el mapa.'); return; }
+      if (!data.length) { alert(I18N.autoT('Dirección no encontrada, hacé clic en el mapa.')); return; }
       const { lat, lon, display_name } = data[0];
       mapa.setView([lat, lon], 16);
       if (marker) mapa.removeLayer(marker);
@@ -180,7 +180,7 @@ function buscarDir() {
       document.getElementById('inp-lat').value = latSel;
       document.getElementById('inp-lng').value = lngSel;
       document.getElementById('dir-final').value = display_name.split(',').slice(0,3).join(',');
-    }).catch(() => alert('No se pudo buscar la dirección. Hacé clic en el mapa.'));
+    }).catch(() => alert(I18N.autoT('No se pudo buscar la dirección. Hacé clic en el mapa.')));
 }
 
 /* Tipo de acceso */
@@ -214,7 +214,7 @@ function quitarConector(i) { conectores.splice(i,1); renderConectores(); }
 function irPaso(n) {
   /* Validaciones */
   if (n > 0 && pasoActual === 0 && (!latSel || !lngSel)) {
-    alert('Hacé clic en el mapa para seleccionar la ubicación.'); return;
+    alert(I18N.autoT('Hacé clic en el mapa para seleccionar la ubicación.')); return;
   }
   if (n > 1 && pasoActual === 1) {
     const nom = document.getElementById('nombre-c').value.trim();
@@ -297,6 +297,7 @@ function guardar() {
     if (json.ok) {
       document.getElementById('panel-3').style.display = 'none';
       document.getElementById('panel-exito').style.display = '';
+      document.getElementById('success-icon').innerHTML = ICONS.reservedCheck(64);
     } else {
       mostrarErrorGuardar('✗ ' + (json.error || 'No se pudo guardar el cargador.'));
       btn.disabled = false;
@@ -309,14 +310,6 @@ function guardar() {
     btn.innerHTML = '<span data-icon="checkCircle" data-size="16"></span> Guardar cargador';
   });
 }
-</script>
-<script>
-// Render success icon when panel is shown
-const _origGuardar = typeof guardar === 'function' ? guardar : null;
-document.addEventListener('DOMContentLoaded', () => {
-  const el = document.getElementById('success-icon');
-  if (el) el.innerHTML = ICONS.reservedCheck(64);
-});
 </script>
 </body>
 </html>
