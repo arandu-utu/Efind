@@ -273,7 +273,7 @@ function abrirPopup(c) {
   const badgeClass = _BADGE[c.estado] ?? 'badge-gray';
   const potMax     = c.conectores.length ? Math.max(...c.conectores.map(x => x.potencia)) : 0;
   const conTypes   = [...new Set(c.conectores.map(x => x.tipo))].join(' · ') || 'Sin datos';
-  const precio     = c.costo_kwh ? `$${c.costo_kwh}/kWh` : I18N.t('gratuito');
+  const precio     = esUte ? I18N.t('tarifa_ute') : (c.costo_kwh ? `$${c.costo_kwh}/kWh` : I18N.t('gratuito'));
   const horario    = c.horario || I18N.t('no_especificado');
   const uteTag     = esUte
     ? `<span class="badge badge-ute" style="font-size:.62rem;vertical-align:middle;padding:.1rem .4rem">UTE</span>`

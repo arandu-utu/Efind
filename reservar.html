@@ -212,7 +212,7 @@ let C = null, calcActual = null;
     C = {
       id: r.data.id, nombre: r.data.nombre, direccion: r.data.direccion || 'Sin dirección registrada',
       horario: r.data.horario || 'No especificado', costo_kwh: +r.data.costo_kwh || 0,
-      propietario_id: r.data.propietario_id,
+      propietario_id: r.data.propietario_id, fuente: r.data.fuente,
       conectores: (r.data.conectores || []).map(c => ({ tipo: c.tipo, potencia: parseFloat(c.potencia_kw) })),
     };
     await init();
@@ -224,7 +224,7 @@ async function init() {
 
   document.getElementById('resumen-cargador').innerHTML = `
     <strong>${escapeHtml(C.nombre)}</strong> &nbsp;·&nbsp; ${escapeHtml(C.direccion)}<br>
-    <span style="color:var(--soft)">${escapeHtml(C.horario)} &nbsp;·&nbsp; ${C.costo_kwh ? '$'+C.costo_kwh+'/kWh' : 'Gratuito'}</span>`;
+    <span style="color:var(--soft)">${escapeHtml(C.horario)} &nbsp;·&nbsp; ${C.fuente === 'ute' ? 'Consultar tarifa UTE' : (C.costo_kwh ? '$'+C.costo_kwh+'/kWh' : 'Gratuito')}</span>`;
 
   /* Vehículos del usuario */
   const sel  = document.getElementById('sel-vehiculo');

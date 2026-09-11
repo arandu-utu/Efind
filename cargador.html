@@ -205,7 +205,7 @@ function renderPage() {
   const labelMap  = { disponible:'Disponible', ocupado:'Ocupado', sin_servicio:'Sin servicio' };
   const potMax    = C.conectores.length ? Math.max(...C.conectores.map(x=>x.potencia)) : '—';
   const prom      = promEstrellas(C.resenas);
-  const precio    = C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito';
+  const precio    = C.fuente === 'ute' ? 'Consultar tarifa UTE' : (C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito');
   const colaText  = C.cola > 0 ? `${ICONS.clock(13)} ${C.cola} vehículo${C.cola>1?'s':''} en cola` : 'Sin espera';
   const colaColor = C.cola > 0 ? 'var(--warn)' : 'var(--green)';
   const colaFlex  = 'display:inline-flex;align-items:center;gap:.3rem';
