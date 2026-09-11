@@ -335,6 +335,11 @@ window.I18N = {
     'Cargando usuarios…': 'Loading users…',
     'Eliminar': 'Delete',
     'Aceptar': 'Accept',
+    /* Etiquetas accesibles (aria-label) */
+    'Cerrar': 'Close',
+    'Quitar conector': 'Remove connector',
+    'Detalle del cargador': 'Charger details',
+    'Calificación': 'Rating',
     'No tenés cargadores registrados.': 'You have no registered chargers.',
     'Ver': 'View',
     'Sin historial': 'No history',
@@ -475,6 +480,12 @@ window.I18N = {
     document.querySelectorAll('input[placeholder]:not([data-i18n-placeholder]), textarea[placeholder]:not([data-i18n-placeholder])').forEach(el => {
       if (el.__i18nPh === undefined) el.__i18nPh = el.placeholder;
       el.placeholder = this.autoT(el.__i18nPh);
+    });
+
+    /* Los aria-label no son nodos de texto, así que el TreeWalker no los ve. */
+    document.querySelectorAll('[aria-label]').forEach(el => {
+      if (el.__i18nAria === undefined) el.__i18nAria = el.getAttribute('aria-label');
+      el.setAttribute('aria-label', this.autoT(el.__i18nAria));
     });
 
     document.querySelectorAll('.lang-btn').forEach(b => {

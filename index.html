@@ -102,7 +102,7 @@
 
 <!-- ── Modal detalle rápido ──────────────────────────────────── -->
 <div id="popup-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)cerrarPopup()">
-  <div class="modal" id="popup-content"></div>
+  <div class="modal" id="popup-content" role="dialog" aria-modal="true" aria-label="Detalle del cargador"></div>
 </div>
 
 <footer class="site-footer" id="footer"></footer>
@@ -282,7 +282,7 @@ function abrirPopup(c) {
   const u = Auth.get();
 
   document.getElementById('popup-content').innerHTML = `
-    <button class="modal__close" onclick="cerrarPopup()">&times;</button>
+    <button class="modal__close" onclick="cerrarPopup()" aria-label="Cerrar">&times;</button>
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.4rem">
       <h2 style="font-size:1.05rem;font-weight:800;color:var(--nav);flex:1">${escapeHtml(c.nombre)} ${uteTag}</h2>
       <span class="badge ${badgeClass}">${_LABEL_OF(c.estado)}</span>
@@ -303,6 +303,10 @@ function abrirPopup(c) {
   `;
   document.getElementById('popup-overlay').style.display = 'flex';
 }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('popup-overlay').style.display === 'flex') cerrarPopup();
+});
 
 function cerrarPopup() {
   document.getElementById('popup-overlay').style.display = 'none';

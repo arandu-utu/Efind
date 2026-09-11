@@ -82,21 +82,21 @@
           <div style="display:flex;flex-direction:column;gap:.7rem" id="form-vehiculo">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">
               <div class="form-group">
-                <label class="form-label">Marca</label>
+                <label class="form-label" for="v-marca">Marca</label>
                 <input type="text" id="v-marca" class="form-input" placeholder="Tesla">
               </div>
               <div class="form-group">
-                <label class="form-label">Modelo</label>
+                <label class="form-label" for="v-modelo">Modelo</label>
                 <input type="text" id="v-modelo" class="form-input" placeholder="Model 3">
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">
               <div class="form-group">
-                <label class="form-label">Capacidad (kWh)</label>
+                <label class="form-label" for="v-cap">Capacidad (kWh)</label>
                 <input type="number" id="v-cap" class="form-input" placeholder="60" min="5" max="200" step="0.5">
               </div>
               <div class="form-group">
-                <label class="form-label">Tipo de conector</label>
+                <label class="form-label" for="v-conector">Tipo de conector</label>
                 <select id="v-conector" class="form-select">
                   <option>Type 2</option><option>CCS2</option>
                   <option>CHAdeMO</option><option>Schuko</option>
@@ -105,7 +105,7 @@
               </div>
             </div>
             <button class="btn btn--primary btn--sm" onclick="agregarVehiculo()">Guardar vehículo</button>
-            <div id="alert-vehiculos" style="display:none"></div>
+            <div id="alert-vehiculos" role="status" aria-live="polite" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -227,7 +227,7 @@ async function renderVehiculos() {
             <td>${escapeHtml(v.marca)}</td><td>${escapeHtml(v.modelo)}</td>
             <td>${v.capacidad_kwh} kWh</td>
             <td>${escapeHtml(v.tipo_conector)}</td>
-            <td><button class="btn btn--ghost btn--sm" onclick="eliminarVehiculo(${v.id})">${ICONS.x(14)}</button></td>
+            <td><button class="btn btn--ghost btn--sm" onclick="eliminarVehiculo(${v.id})" aria-label="Eliminar vehículo">${ICONS.x(14)}</button></td>
           </tr>`).join('')}
         </tbody>
       </table>` : '<p style="font-size:.88rem;color:var(--soft)">No tenés vehículos registrados.</p>';

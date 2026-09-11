@@ -42,16 +42,16 @@
         <button class="btn btn--primary btn--sm" onclick="buscarDir()">Buscar</button>
       </div>
     </div>
-    <div id="alert-ubicacion" style="display:none;margin-bottom:.75rem"></div>
+    <div id="alert-ubicacion" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
     <div id="mapa-nuevo" style="height:280px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);margin-bottom:.75rem"></div>
     <div class="alert alert-info" style="font-size:.8rem;margin-bottom:.75rem"><span data-icon="info" data-size="14"></span> Hacé clic en el mapa para colocar el marcador con precisión.</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
       <div class="form-group">
-        <label class="form-label">Latitud</label>
+        <label class="form-label" for="inp-lat">Latitud</label>
         <input type="text" id="inp-lat" class="form-input" readonly placeholder="-34.9058">
       </div>
       <div class="form-group">
-        <label class="form-label">Longitud</label>
+        <label class="form-label" for="inp-lng">Longitud</label>
         <input type="text" id="inp-lng" class="form-input" readonly placeholder="-56.1882">
       </div>
     </div>
@@ -81,8 +81,8 @@
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Tipo de acceso</label>
-        <div class="rol-grid">
+        <span class="form-label" id="lbl-acceso">Tipo de acceso</span>
+        <div class="rol-grid" role="radiogroup" aria-labelledby="lbl-acceso">
           <label class="rol-card selected" id="card-pub">
             <input type="radio" name="acceso" value="publico" checked>
             <div class="rol-icon"><span data-icon="globe" data-size="22"></span></div>
@@ -119,7 +119,7 @@
   <div id="panel-3" class="card" style="display:none">
     <div class="card__title"><span data-icon="checkCircle" data-size="15"></span> Paso 4 — Confirmar</div>
     <div id="resumen-final" style="font-size:.9rem;line-height:1.8"></div>
-    <div id="alert-agregar" style="display:none;margin-top:.75rem"></div>
+    <div id="alert-agregar" role="status" aria-live="polite" style="display:none;margin-top:.75rem"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem">
       <button class="btn btn--ghost" onclick="irPaso(2)">← Volver</button>
       <button class="btn btn--green btn--lg" onclick="guardar()"><span data-icon="checkCircle" data-size="16"></span> Guardar cargador</button>
@@ -205,7 +205,7 @@ function renderConectores() {
              style="width:90px;font-size:.85rem" min="1" max="350" step="0.1"
              onchange="conectores[${i}].potencia=+this.value" title="Potencia (kW)">
       <span style="font-size:.8rem;color:var(--soft);white-space:nowrap">kW</span>
-      ${conectores.length>1 ? `<button class="btn btn--ghost btn--sm" onclick="quitarConector(${i})">${ICONS.x(14)}</button>` : ''}
+      ${conectores.length>1 ? `<button class="btn btn--ghost btn--sm" onclick="quitarConector(${i})" aria-label="Quitar conector">${ICONS.x(14)}</button>` : ''}
     </div>`).join('');
 }
 function agregarConector() { conectores.push({tipo:'Type 2',potencia:7.4}); renderConectores(); }

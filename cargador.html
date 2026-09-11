@@ -48,9 +48,9 @@
 
 <!-- Modal reseña -->
 <div id="modal-resena" class="modal-overlay center" style="display:none" onclick="if(event.target===this)cerrarResena()">
-  <div class="modal">
-    <button class="modal__close" onclick="cerrarResena()">&times;</button>
-    <h3 class="modal__title">Escribir reseña</h3>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-resena">
+    <button class="modal__close" onclick="cerrarResena()" aria-label="Cerrar">&times;</button>
+    <h3 class="modal__title" id="titulo-resena">Escribir reseña</h3>
     <div class="form-group" style="margin-bottom:.85rem">
       <label class="form-label">Calificación</label>
       <div class="stars-input" id="stars-input">
@@ -61,25 +61,25 @@
       <label class="form-label" for="txt-resena">Comentario (opcional)</label>
       <textarea id="txt-resena" class="form-textarea" placeholder="Contá tu experiencia con este cargador…"></textarea>
     </div>
-    <div id="resena-alert" style="display:none;margin-bottom:.75rem"></div>
+    <div id="resena-alert" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
     <button class="btn btn--primary btn--full" onclick="enviarResena()">Publicar reseña</button>
   </div>
 </div>
 
 <!-- Modal reportar -->
 <div id="modal-reporte" class="modal-overlay center" style="display:none" onclick="if(event.target===this)cerrarReporte()">
-  <div class="modal">
-    <button class="modal__close" onclick="cerrarReporte()">&times;</button>
-    <h3 class="modal__title">Reportar problema</h3>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-reporte">
+    <button class="modal__close" onclick="cerrarReporte()" aria-label="Cerrar">&times;</button>
+    <h3 class="modal__title" id="titulo-reporte">Reportar problema</h3>
     <div class="form-group" style="margin-bottom:.8rem">
-      <label class="form-label">Tipo de problema</label>
+      <label class="form-label" for="tipo-reporte">Tipo de problema</label>
       <select id="tipo-reporte" class="form-select"></select>
     </div>
     <div class="form-group" style="margin-bottom:.8rem">
-      <label class="form-label">Descripción (opcional)</label>
+      <label class="form-label" for="txt-reporte">Descripción (opcional)</label>
       <textarea id="txt-reporte" class="form-textarea" placeholder="Describí el problema…"></textarea>
     </div>
-    <div id="reporte-alert" style="display:none;margin-bottom:.75rem"></div>
+    <div id="reporte-alert" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
     <button class="btn btn--warn btn--full" onclick="enviarReporte()">Enviar reporte</button>
   </div>
 </div>
@@ -295,7 +295,7 @@ function renderPage() {
             </div>
             <hr class="divider">
             <div class="form-group">
-              <label class="form-label">Cola de espera</label>
+              <label class="form-label" for="sel-cola">Cola de espera</label>
               <select id="sel-cola" class="form-select" style="font-size:.85rem">
                 <option value="0">Sin cola</option>
                 <option value="1">1 vehículo</option>
@@ -307,7 +307,7 @@ function renderPage() {
               </button>
             </div>
           `}
-          <div id="crowd-feedback" style="display:none;margin-top:.75rem"></div>
+          <div id="crowd-feedback" role="status" aria-live="polite" style="display:none;margin-top:.75rem"></div>
         </div>
       </div>
     </div>
@@ -337,6 +337,13 @@ function abrirResena() {
   document.getElementById('modal-resena').style.display = 'flex';
 }
 function cerrarResena() { document.getElementById('modal-resena').style.display = 'none'; }
+
+/* Escape cierra el modal que esté abierto. */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('modal-resena').style.display  === 'flex') cerrarResena();
+  if (document.getElementById('modal-reporte').style.display === 'flex') cerrarReporte();
+});
 
 async function enviarResena() {
   if (!pickerResena?.valor) {

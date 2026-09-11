@@ -41,7 +41,7 @@
 
     <!-- Vehículo -->
     <div class="form-group" style="margin-bottom:.85rem">
-      <label class="form-label">Mi vehículo</label>
+      <label class="form-label" for="sel-vehiculo">Mi vehículo</label>
       <select id="sel-vehiculo" class="form-select" onchange="recalcular()">
         <option value="">— Seleccioná un vehículo —</option>
       </select>
@@ -49,13 +49,13 @@
 
     <!-- Conector -->
     <div class="form-group" style="margin-bottom:.85rem">
-      <label class="form-label">Tipo de conector</label>
+      <label class="form-label" for="sel-conector">Tipo de conector</label>
       <select id="sel-conector" class="form-select" onchange="recalcular()"></select>
     </div>
 
     <!-- SOC -->
     <div class="form-group" style="margin-bottom:.85rem">
-      <label class="form-label">Estado de carga actual: <strong id="soc-val">20%</strong></label>
+      <label class="form-label" for="soc">Estado de carga actual: <strong id="soc-val">20%</strong></label>
       <input type="range" id="soc" min="0" max="99" value="20"
              style="width:100%;accent-color:var(--accent)"
              oninput="document.getElementById('soc-val').textContent=this.value+'%';recalcular()">
@@ -84,26 +84,26 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:.8rem">
       <div class="form-group">
-        <label class="form-label">Número de tarjeta</label>
+        <label class="form-label" for="num-tarjeta">Número de tarjeta</label>
         <input type="text" id="num-tarjeta" class="form-input" placeholder="1234 5678 9012 3456"
                maxlength="19" oninput="formatCard(this)">
       </div>
       <div class="form-group">
-        <label class="form-label">Nombre en la tarjeta</label>
+        <label class="form-label" for="nombre-tarjeta">Nombre en la tarjeta</label>
         <input type="text" id="nombre-tarjeta" class="form-input" placeholder="JUAN PEREZ">
       </div>
       <div class="pago-grid">
         <div class="form-group">
-          <label class="form-label">Vencimiento</label>
+          <label class="form-label" for="venc">Vencimiento</label>
           <input type="text" id="venc" class="form-input" placeholder="MM/AA" maxlength="5" oninput="formatVenc(this)">
         </div>
         <div class="form-group">
-          <label class="form-label">CVV</label>
+          <label class="form-label" for="cvv">CVV</label>
           <input type="text" id="cvv" class="form-input" placeholder="123" maxlength="3">
         </div>
       </div>
     </div>
-    <div id="pago-alert" style="display:none;margin-top:.75rem"></div>
+    <div id="pago-alert" role="status" aria-live="polite" style="display:none;margin-top:.75rem"></div>
     <div style="display:flex;gap:.6rem;margin-top:1.1rem">
       <button class="btn btn--ghost" onclick="volverReserva()">← Volver</button>
       <button class="btn btn--primary btn--full" onclick="procesarPago()" id="btn-pagar">
@@ -137,7 +137,7 @@
         </div>
         <textarea id="rating-comentario" class="form-textarea" rows="2"
           placeholder="Comentario opcional…" style="margin-bottom:.75rem"></textarea>
-        <div id="alert-rating" style="display:none;margin-bottom:.75rem"></div>
+        <div id="alert-rating" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
         <button class="btn btn--green btn--sm" onclick="enviarCalificacion()">Enviar calificación</button>
         <button class="btn btn--ghost btn--sm" onclick="document.getElementById('rating-section').style.display='none'" style="margin-left:.5rem">Omitir</button>
       </div>

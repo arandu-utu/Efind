@@ -14,7 +14,7 @@ function cargadorIdFromURL() {
  * @param {number} px  — tamaño en px (width/height del SVG)
  */
 function solSVG(px = 16) {
-  return `<svg viewBox="0 0 32 32" width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;flex-shrink:0;transition:transform .15s ease">
+  return `<svg viewBox="0 0 32 32" width="${px}" height="${px}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:middle;flex-shrink:0;transition:transform .15s ease">
     <!-- Rayos rectos: 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315° -->
     <line x1="16" y1="8" x2="16" y2="1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" transform="rotate(0 16 16)"/>
     <line x1="16" y1="8" x2="16" y2="1.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" transform="rotate(45 16 16)"/>
@@ -74,25 +74,54 @@ function renderStars(promedio, total) {
  * @param {string} clase         — clase de cada sol (la define el CSS de cada página)
  * @param {number} px            — tamaño de cada sol
  */
-function crearSolPicker(contenedorId, clase, px) {
+function crearSolPicker(contenedorId, clase, px, etiqueta = 'Calificación') {
   const cont = document.getElementById(contenedorId);
   if (!cont) return null;
   const api = { valor: 0 };
 
-  const pintar = (hasta, color, conEscala) => cont.querySelectorAll('.' + clase).forEach(s => {
+  /* Se expone como radiogroup: cada sol es un radio navegable con flechas
+     y elegible con Enter o barra espaciadora. */
+  cont.setAttribute('role', 'radiogroup');
+  cont.setAttribute('aria-label', I18N.autoT(etiqueta));
+  cont.innerHTML = [1, 2, 3, 4, 5].map(v =>
+    `<span class="${clase}" data-v="${v}" role="radio" aria-checked="false" aria-label="${v}"
+           tabindex="${v === 1 ? 0 : -1}" style="color:#C8D3DF">${solSVG(px)}</span>`
+  ).join('');
+
+  const soles = [...cont.querySelectorAll('.' + clase)];
+
+  const pintar = (hasta, color, conEscala) => soles.forEach(s => {
     const activo = +s.dataset.v <= hasta;
     s.style.color = activo ? color : '#C8D3DF';
     if (conEscala) s.style.transform = activo ? 'scale(1.08)' : 'scale(1)';
   });
 
-  cont.innerHTML = [1, 2, 3, 4, 5].map(v =>
-    `<span class="${clase}" data-v="${v}" style="color:#C8D3DF">${solSVG(px)}</span>`
-  ).join('');
+  const elegir = v => {
+    api.valor = v;
+    pintar(v, '#F5B800', true);
+    soles.forEach(s => {
+      const actual = +s.dataset.v === v;
+      s.setAttribute('aria-checked', actual);
+      s.tabIndex = actual ? 0 : -1;
+    });
+  };
 
-  cont.querySelectorAll('.' + clase).forEach(s => {
-    s.onclick      = () => { api.valor = +s.dataset.v; pintar(api.valor, '#F5B800', true); };
-    s.onmouseenter = () => pintar(+s.dataset.v, '#FFCC30', false);
+  soles.forEach(s => {
+    const v = +s.dataset.v;
+    s.onclick      = () => elegir(v);
+    s.onmouseenter = () => pintar(v, '#FFCC30', false);
     s.onmouseleave = () => pintar(api.valor, '#F5B800', false);
+    s.onfocus      = () => pintar(v, '#FFCC30', false);
+    s.onblur       = () => pintar(api.valor, '#F5B800', false);
+    s.onkeydown    = e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); return elegir(v); }
+      const paso = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+      if (!paso) return;
+      e.preventDefault();
+      const destino = Math.min(5, Math.max(1, v + paso));
+      elegir(destino);
+      soles[destino - 1].focus();
+    };
   });
   return api;
 }

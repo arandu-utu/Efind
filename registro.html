@@ -41,14 +41,14 @@
       <button class="tab-btn active">Registrarse</button>
     </div>
 
-    <div id="alert-box" style="display:none"></div>
+    <div id="alert-box" role="status" aria-live="polite" style="display:none"></div>
 
     <form id="reg-form" style="display:flex;flex-direction:column;gap:.8rem" novalidate>
 
       <!-- Tipo de cuenta -->
       <div class="form-group">
-        <label class="form-label">Tipo de cuenta</label>
-        <div class="rol-grid">
+        <span class="form-label" id="lbl-rol">Tipo de cuenta</span>
+        <div class="rol-grid" role="radiogroup" aria-labelledby="lbl-rol">
           <label class="rol-card selected" id="card-particular">
             <input type="radio" name="rol" value="particular" checked>
             <div class="rol-icon"><span data-icon="user" data-size="22"></span></div>

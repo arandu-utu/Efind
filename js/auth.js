@@ -148,10 +148,10 @@ function renderNavbar() {
         ${u ? `
           <a href="agregar.html" class="btn btn--green btn--sm">${t('nav_agregar')}</a>
           <div class="navbar__user" id="user-menu">
-            <div class="user-chip">
+            <button type="button" class="user-chip" aria-haspopup="true" aria-expanded="false">
               <div class="avatar">${u.avatar || u.nombre[0].toUpperCase()}</div>
               ${u.nombre.split(' ')[0]}
-            </div>
+            </button>
             <div class="dropdown">
               <a href="perfil.html">${ICONS.user(15)} ${t('nav_perfil')}</a>
               ${isAdmin ? `<a href="admin.html">${ICONS.settings(15)} ${t('nav_administracion')}</a>` : ''}
@@ -231,17 +231,22 @@ function wireUserMenu() {
   if (chip) {
     chip.onclick = (e) => {
       e.stopPropagation();
-      menu.classList.toggle('open');
+      chip.setAttribute('aria-expanded', menu.classList.toggle('open'));
     };
   }
 
   const dropdown = menu.querySelector('.dropdown');
   if (dropdown) dropdown.onclick = (e) => e.stopPropagation();
 
+  const cerrarMenu = () => {
+    const m = document.getElementById('user-menu');
+    m?.classList.remove('open');
+    m?.querySelector('.user-chip')?.setAttribute('aria-expanded', 'false');
+  };
+
   if (!window.__userMenuOutsideClickWired) {
     window.__userMenuOutsideClickWired = true;
-    document.addEventListener('click', () => {
-      document.getElementById('user-menu')?.classList.remove('open');
-    });
+    document.addEventListener('click', cerrarMenu);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarMenu(); });
   }
 }

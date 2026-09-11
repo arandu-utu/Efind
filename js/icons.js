@@ -6,8 +6,10 @@
  * Para íconos estáticos en HTML: <span data-icon="bolt" data-size="18"></span>
  * El init automático los reemplaza en DOMContentLoaded.
  */
+/* aria-hidden: son íconos decorativos. Donde el ícono es el único contenido
+   de un botón, el botón lleva su propio aria-label. */
 function _svg(px, content, extra = '') {
-  return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;flex-shrink:0" ${extra}>${content}</svg>`;
+  return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" style="display:inline-block;vertical-align:middle;flex-shrink:0" ${extra}>${content}</svg>`;
 }
 
 const ICONS = {
