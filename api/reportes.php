@@ -17,6 +17,14 @@ try {
     /* ── GET: listar pendientes (admin) ──────────────────────── */
     if ($method === 'GET') {
         requiere_rol(1);
+
+        $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
+        $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
+        $offset    = ($pagina - 1) * $porPagina;
+
+        $total = (int)$db->query("SELECT COUNT(*) FROM reportes WHERE resuelto = 0")->fetchColumn();
+
+        /* Enteros ya acotados arriba: MariaDB no admite placeholders en LIMIT. */
         $stmt = $db->query("
             SELECT r.id, r.punto_carga_id, r.tipo, r.descripcion,
                    r.resuelto, r.creado_en,
@@ -27,8 +35,18 @@ try {
             LEFT JOIN usuarios     u ON u.id = r.usuario_id
             WHERE  r.resuelto = 0
             ORDER  BY r.creado_en DESC
+            LIMIT  $porPagina OFFSET $offset
         ");
-        echo json_encode(['ok' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+
+        echo json_encode(['ok' => true,
+            'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'meta' => [
+                'pagina'     => $pagina,
+                'por_pagina' => $porPagina,
+                'total'      => $total,
+                'paginas'    => (int)ceil($total / $porPagina),
+            ],
+        ]);
 
     /* ── POST: crear reporte (usuario autenticado) ───────────── */
     } elseif ($method === 'POST') {

@@ -44,14 +44,36 @@ try {
         }
 
         requiere_rol(1);
+
+        $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
+        $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
+        $offset    = ($pagina - 1) * $porPagina;
+
+        $total = (int)$db->query("
+            SELECT COUNT(*) FROM resenas r
+            JOIN   puntos_carga p ON p.id = r.punto_carga_id
+            WHERE  r.estado = 'pendiente'
+        ")->fetchColumn();
+
+        /* Enteros ya acotados arriba: MariaDB no admite placeholders en LIMIT. */
         $stmt = $db->query("
             SELECT r.*, p.nombre AS cargador_nombre
             FROM   resenas r
             JOIN   puntos_carga p ON p.id = r.punto_carga_id
             WHERE  r.estado = 'pendiente'
             ORDER  BY r.fecha_creacion DESC
+            LIMIT  $porPagina OFFSET $offset
         ");
-        echo json_encode(['ok' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+
+        echo json_encode(['ok' => true,
+            'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
+            'meta' => [
+                'pagina'     => $pagina,
+                'por_pagina' => $porPagina,
+                'total'      => $total,
+                'paginas'    => (int)ceil($total / $porPagina),
+            ],
+        ]);
 
     /* ── POST: crear reseña ──────────────────────────────────── */
     } elseif ($method === 'POST') {

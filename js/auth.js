@@ -65,6 +65,44 @@ function mostrarCargando(id, texto = 'Cargando…') {
        <span class="spinner"></span>${escapeHtml(I18N.autoT(texto))}</div>`;
 }
 
+/* ── Barra de paginación para los listados del panel de administración.
+   `meta` es el objeto que devuelven las APIs: {pagina, por_pagina, total, paginas}.
+   Llama a alCambiar(nuevaPagina) cuando el admin se mueve de página. */
+function renderPaginacion(id, meta, alCambiar) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!meta || meta.paginas <= 1) { el.innerHTML = ''; return; }
+
+  const desde = (meta.pagina - 1) * meta.por_pagina + 1;
+  const hasta = Math.min(meta.pagina * meta.por_pagina, meta.total);
+
+  /* Estos dos textos llevan números intercalados, así que no se pueden buscar
+     tal cual en el diccionario: se arman según el idioma activo. */
+  const es     = I18N.get() === 'es';
+  const rango  = es ? `${desde}–${hasta} de ${meta.total}`
+                    : `${desde}–${hasta} of ${meta.total}`;
+  const cuenta = es ? `Página ${meta.pagina} de ${meta.paginas}`
+                    : `Page ${meta.pagina} of ${meta.paginas}`;
+
+  el.innerHTML = `
+    <nav aria-label="Paginación" style="display:flex;align-items:center;justify-content:space-between;
+         gap:.75rem;flex-wrap:wrap;padding-top:.9rem;margin-top:.9rem;border-top:1px solid var(--border)">
+      <span style="font-size:.8rem;color:var(--soft)">${rango}</span>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <button class="btn btn--outline btn--sm" data-pag="${meta.pagina - 1}"
+                ${meta.pagina <= 1 ? 'disabled' : ''} aria-label="Página anterior">←</button>
+        <span style="font-size:.8rem;color:var(--soft)">${cuenta}</span>
+        <button class="btn btn--outline btn--sm" data-pag="${meta.pagina + 1}"
+                ${meta.pagina >= meta.paginas ? 'disabled' : ''} aria-label="Página siguiente">→</button>
+      </div>
+    </nav>`;
+
+  el.querySelectorAll('[data-pag]').forEach(b => {
+    b.onclick = () => alCambiar(+b.dataset.pag);
+  });
+  I18N.apply(false);
+}
+
 /* ── Confirmación en un modal propio, en lugar del confirm() del navegador.
    Devuelve una promesa que resuelve a true si el usuario acepta. */
 function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', peligro = false } = {}) {

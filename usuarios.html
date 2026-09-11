@@ -36,14 +36,14 @@
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem">
       <h1 class="admin-title" style="margin-bottom:0">Gestión de usuarios</h1>
       <div style="display:flex;gap:.5rem;align-items:center">
-        <select id="f-rol" class="form-select" style="font-size:.85rem;width:auto" onchange="renderTabla()">
+        <select id="f-rol" class="form-select" style="font-size:.85rem;width:auto" onchange="cargarUsuarios(1)">
           <option value="">Todos los roles</option>
           <option value="2">Particular</option>
           <option value="3">Propietario</option>
           <option value="1">Admin</option>
         </select>
         <input type="text" id="f-buscar" class="form-input" style="font-size:.85rem;width:200px"
-               placeholder="Buscar nombre o email…" oninput="renderTabla()">
+               placeholder="Buscar nombre o email…" oninput="buscarConRetardo()">
       </div>
     </div>
 
@@ -72,6 +72,7 @@
           <div class="empty-state__body">No hay usuarios que coincidan con el filtro aplicado.</div>
         </div>
       </div>
+      <div id="pag-usuarios"></div>
     </div>
   </div>
 </div>
@@ -90,35 +91,53 @@ document.getElementById('icon-sin-usuarios').innerHTML = ICONS.users(40);
 const ROLES_LABEL = { 1:'Admin', 2:'Particular', 3:'Propietario' };
 const ROLES_BADGE = { 1:'badge-red', 2:'badge-blue', 3:'badge-green' };
 
-let usuarios = [];
+let usuarios = [];            // sólo la página que se está mostrando
+let paginaActual = 1;
+let temporizadorBusqueda = null;
 
-/* ── Carga inicial ─────────────────────────────────────────────── */
-async function init() {
+/* ── Carga de una página ────────────────────────────────────────
+   El filtrado va en el servidor: si filtráramos acá sólo se filtraría la
+   página visible, que es justo lo que rompería la paginación. */
+async function cargarUsuarios(pagina = paginaActual) {
+  paginaActual = pagina;
+
   /* El contenedor es un <tbody>, así que el placeholder va como fila propia. */
   document.getElementById('tbody-usuarios').innerHTML =
     `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--soft);font-size:.85rem">
        <span class="spinner" style="vertical-align:middle;margin-right:.5rem"></span>Cargando usuarios…</td></tr>`;
-  const res = await apiFetch('/api/usuarios.php').catch(() => ({ ok: false, error: 'Error de conexión con el servidor.' }));
+
+  const params = new URLSearchParams({ pagina, por_pagina: 20 });
+  const rol = document.getElementById('f-rol').value;
+  const q   = document.getElementById('f-buscar').value.trim();
+  if (rol) params.set('rol', rol);
+  if (q)   params.set('q', q);
+
+  const res = await apiFetch('/api/usuarios.php?' + params)
+                    .catch(() => ({ ok: false, error: 'Error de conexión con el servidor.' }));
   if (!res.ok) {
     document.getElementById('tbody-usuarios').innerHTML = '';
+    document.getElementById('pag-usuarios').innerHTML   = '';
     showAlert('alert-accion', 'No se pudieron cargar los usuarios. ' + (res.error || ''), 'error');
     return;
   }
+
+  /* Si el filtro dejó vacía la última página, se retrocede una. */
+  if (!res.data.length && pagina > 1) return cargarUsuarios(pagina - 1);
+
   usuarios = res.data;
   renderTabla();
+  renderPaginacion('pag-usuarios', res.meta, cargarUsuarios);
 }
 
-/* ── Renderizado con filtros ────────────────────────────────────── */
-function renderTabla() {
-  const filtroRol  = document.getElementById('f-rol').value;
-  const filtroBusc = document.getElementById('f-buscar').value.toLowerCase();
+/* Espera a que el admin deje de tipear antes de consultar al servidor. */
+function buscarConRetardo() {
+  clearTimeout(temporizadorBusqueda);
+  temporizadorBusqueda = setTimeout(() => cargarUsuarios(1), 300);
+}
 
-  const lista = usuarios.filter(u => {
-    if (filtroRol && String(u.rol_id) !== filtroRol) return false;
-    if (filtroBusc && !u.nombre.toLowerCase().includes(filtroBusc) &&
-                      !u.email.toLowerCase().includes(filtroBusc)) return false;
-    return true;
-  });
+/* ── Renderizado de la página actual ────────────────────────────── */
+function renderTabla() {
+  const lista = usuarios;
 
   const tbody = document.getElementById('tbody-usuarios');
   const sinRes = document.getElementById('sin-resultados');
@@ -170,10 +189,10 @@ function renderTabla() {
 async function patchUsuario(id, campo, valor, msgOk, tipoOk = 'success') {
   const res = await apiFetch('/api/usuarios.php', 'PATCH', { id, [campo]: valor });
   if (res.ok) {
-    const u = usuarios.find(x => +x.id === id);
-    if (u) u[campo] = valor;
     mostrarAlerta(msgOk, tipoOk);
-    renderTabla();
+    /* Se recarga la página en vez de tocar el array local: si hay un filtro de
+       rol activo, el usuario editado puede haber dejado de pertenecer a él. */
+    cargarUsuarios();
   } else {
     mostrarAlerta('Error: ' + res.error, 'warn');
   }
@@ -191,7 +210,7 @@ function toggleActivo(id) {
 
 function mostrarAlerta(msg, tipo) { showAlert('alert-accion', msg, tipo, 3000); }
 
-init();
+cargarUsuarios(1);
 </script>
 </body>
 </html>

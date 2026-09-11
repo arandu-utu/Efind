@@ -360,6 +360,12 @@ window.I18N = {
     'No se pudo procesar el pedido.': 'The request could not be processed.',
     'Ya pediste varios enlaces en la última hora. Esperá un rato antes de volver a intentar.':
       'You have already requested several links in the last hour. Please wait before trying again.',
+    /* Paginación */
+    'Paginación': 'Pagination',
+    'Página anterior': 'Previous page',
+    'Página siguiente': 'Next page',
+    'No se pudieron cargar las reseñas.': 'The reviews could not be loaded.',
+    'No se pudieron cargar los reportes.': 'The reports could not be loaded.',
     /* Etiquetas accesibles (aria-label) */
     'Cerrar': 'Close',
     'Quitar conector': 'Remove connector',

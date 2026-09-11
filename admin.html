@@ -62,6 +62,7 @@
     <div class="card" id="resenas" style="margin-top:1.25rem">
       <div class="card__title"><span data-icon="sun" data-size="16"></span> Reseñas pendientes de moderación</div>
       <div id="lista-resenas-pend"></div>
+      <div id="pag-resenas"></div>
     </div>
 
     <!-- Reportes abiertos -->
@@ -69,6 +70,7 @@
       <div class="card__title"><span data-icon="warning" data-size="16"></span> Reportes abiertos</div>
       <div id="alert-admin" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
       <div id="lista-reportes"></div>
+      <div id="pag-reportes"></div>
     </div>
 
     <!-- Últimos cargadores -->
@@ -105,32 +107,58 @@ let resenas  = [];
 let reportes = [];
 
 /* ── Carga inicial: todas las APIs en paralelo ───────────────── */
+const POR_PAGINA = 10;
+let paginaResenas  = 1;
+let paginaReportes = 1;
+
 async function initDashboard() {
-  ['lista-resenas-pend', 'lista-reportes'].forEach(id => mostrarCargando(id));
-  try {
-    const [sRes, rRes, reRes, eRes] = await Promise.all([
-      apiFetch('/api/stats.php'),
-      apiFetch('/api/reportes.php'),
-      apiFetch('/api/resenas.php'),
-      apiFetch('/api/estaciones.php?limit=5'),
-    ]);
+  const [sRes, eRes] = await Promise.all([
+    apiFetch('/api/stats.php').catch(() => ({ ok: false })),
+    apiFetch('/api/estaciones.php?limit=5').catch(() => ({ ok: false })),
+  ]);
+  if (sRes.ok) renderStats(sRes.data);
+  if (eRes.ok) renderCargadores(eRes.data);
 
-    if (sRes.ok)  renderStats(sRes.data);
-    if (eRes.ok)  renderCargadores(eRes.data);
+  /* Cada lista se carga y se pagina por su cuenta, así moderar un ítem
+     recarga sólo esa lista y no todo el dashboard. */
+  cargarResenas(1);
+  cargarReportes(1);
+}
 
-    /* Cada lista se resuelve por separado: si su API falla hay que sacar el
-       placeholder de carga, si no queda el spinner girando para siempre. */
-    if (rRes.ok) { reportes = rRes.data; renderReportes(); }
-    else showAlert('lista-reportes', 'No se pudieron cargar los reportes.', 'warn');
-
-    if (reRes.ok) { resenas = reRes.data; renderResenas(); }
-    else showAlert('lista-resenas-pend', 'No se pudieron cargar las reseñas.', 'warn');
-
-  } catch (e) {
-    console.error('Error al cargar dashboard:', e);
-    showAlert('lista-reportes', 'Error de conexión con el servidor.', 'error');
-    showAlert('lista-resenas-pend', 'Error de conexión con el servidor.', 'error');
+async function cargarResenas(pagina = paginaResenas) {
+  paginaResenas = pagina;
+  mostrarCargando('lista-resenas-pend');
+  const res = await apiFetch(`/api/resenas.php?pagina=${pagina}&por_pagina=${POR_PAGINA}`)
+                    .catch(() => ({ ok: false }));
+  if (!res.ok) {
+    document.getElementById('pag-resenas').innerHTML = '';
+    showAlert('lista-resenas-pend', 'No se pudieron cargar las reseñas.', 'warn');
+    return;
   }
+  /* Si se moderó el último ítem de la última página, esa página quedó vacía
+     y hay que retroceder, si no se ve "sin reseñas" habiendo reseñas atrás. */
+  if (!res.data.length && pagina > 1) return cargarResenas(pagina - 1);
+
+  resenas = res.data;
+  renderResenas();
+  renderPaginacion('pag-resenas', res.meta, cargarResenas);
+}
+
+async function cargarReportes(pagina = paginaReportes) {
+  paginaReportes = pagina;
+  mostrarCargando('lista-reportes');
+  const res = await apiFetch(`/api/reportes.php?pagina=${pagina}&por_pagina=${POR_PAGINA}`)
+                    .catch(() => ({ ok: false }));
+  if (!res.ok) {
+    document.getElementById('pag-reportes').innerHTML = '';
+    showAlert('lista-reportes', 'No se pudieron cargar los reportes.', 'warn');
+    return;
+  }
+  if (!res.data.length && pagina > 1) return cargarReportes(pagina - 1);
+
+  reportes = res.data;
+  renderReportes();
+  renderPaginacion('pag-reportes', res.meta, cargarReportes);
 }
 
 /* ── KPIs + gráficos ─────────────────────────────────────────── */
@@ -195,8 +223,9 @@ function renderStats(s) {
 
 /* ── Reseñas pendientes ─────────────────────────────────────── */
 function renderResenas() {
-  const pend = resenas.filter(r => r.estado === 'pendiente');
+  const pend = resenas;   // la API ya devuelve sólo las pendientes de esta página
   const el   = document.getElementById('lista-resenas-pend');
+  el.className = '';      // por si quedó con clase de alerta de un error previo
   el.innerHTML = pend.length ? `
     <div class="table-wrap"><table class="data-table">
       <thead><tr><th>Usuario</th><th>Cargador</th><th>Estrellas</th><th>Comentario</th><th>Acciones</th></tr></thead>
@@ -219,17 +248,16 @@ function renderResenas() {
 
 async function modResena(id, estado) {
   const res = await apiFetch('/api/resenas.php', 'PATCH', { id, estado });
-  if (res.ok) {
-    const item = resenas.find(x => x.id === id);
-    if (item) item.estado = estado;
-    renderResenas();
-  }
+  /* Se recarga la página: la reseña moderada sale de la lista y las de las
+     páginas siguientes se corren un lugar. */
+  if (res.ok) cargarResenas();
 }
 
 /* ── Reportes abiertos ──────────────────────────────────────── */
 function renderReportes() {
-  const pend = reportes.filter(r => !+r.resuelto);
+  const pend = reportes;  // la API ya devuelve sólo los sin resolver de esta página
   const el   = document.getElementById('lista-reportes');
+  el.className = '';      // por si quedó con clase de alerta de un error previo
   el.innerHTML = pend.length ? `
     <div class="table-wrap"><table class="data-table">
       <thead><tr><th>Cargador</th><th>Tipo</th><th>Descripción</th><th>Reportado por</th><th>Fecha</th><th>Aplicar estado</th><th>Acción</th></tr></thead>
@@ -274,11 +302,7 @@ async function resolverReporte(id, puntoCargaId) {
   }
 
   const res = await apiFetch('/api/reportes.php', 'PATCH', { id });
-  if (res.ok) {
-    const item = reportes.find(x => x.id === id);
-    if (item) item.resuelto = 1;
-    renderReportes();
-  }
+  if (res.ok) cargarReportes();
 }
 
 /* ── Últimos cargadores ─────────────────────────────────────── */
