@@ -71,18 +71,22 @@ try {
     $actualizados = 0;
     $omitidos = 0;
 
+    /* La API de UTE no publica horario ni precio por estación. La red
+       CargaME es gratuita y de acceso 24hs (están en estaciones ANCAP);
+       Spolum, otra app que consume la misma API, aplica el mismo
+       supuesto fijo en vez de dejarlo sin especificar. */
     $stmtInsert = $db->prepare("
         INSERT INTO puntos_carga
             (nombre, descripcion, direccion, ciudad, departamento, lat, lng,
-             acceso, estado, fuente, propietario_id, verificado, activo)
+             acceso, estado, fuente, propietario_id, verificado, activo, horario, costo_kwh)
         VALUES
             (:nombre, NULL, :direccion, :ciudad, :departamento, :lat, :lng,
-             'publico', :estado, 'ute', NULL, 1, 1)
+             'publico', :estado, 'ute', NULL, 1, 1, '24 horas', 0)
     ");
     $stmtUpdate = $db->prepare("
         UPDATE puntos_carga
         SET direccion = :direccion, ciudad = :ciudad, departamento = :departamento,
-            lat = :lat, lng = :lng, estado = :estado
+            lat = :lat, lng = :lng, estado = :estado, horario = '24 horas', costo_kwh = 0
         WHERE id = :id
     ");
     $stmtBorrarConectores = $db->prepare("DELETE FROM conectores WHERE punto_carga_id = :id");
