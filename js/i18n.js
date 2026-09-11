@@ -66,6 +66,7 @@ window.I18N = {
       pwd_ver: 'Ver',
       pwd_ocultar: 'Ocultar',
       login_no_account: '¿No tenés cuenta?',
+      login_olvide: '¿Olvidaste tu contraseña?',
       login_registrate_gratis: 'Registrate gratis',
       login_success: 'Sesión iniciada. Redirigiendo…',
       login_error_credenciales: 'Credenciales incorrectas',
@@ -128,6 +129,7 @@ window.I18N = {
       pwd_ver: 'Show',
       pwd_ocultar: 'Hide',
       login_no_account: 'Don’t have an account?',
+      login_olvide: 'Forgot your password?',
       login_registrate_gratis: 'Sign up for free',
       login_success: 'Signed in. Redirecting…',
       login_error_credenciales: 'Incorrect credentials',
@@ -335,6 +337,29 @@ window.I18N = {
     'Cargando usuarios…': 'Loading users…',
     'Eliminar': 'Delete',
     'Aceptar': 'Accept',
+    /* Recuperación de contraseña */
+    'Recuperar contraseña': 'Reset password',
+    'Escribí el correo con el que te registraste y te mandamos un enlace para elegir una contraseña nueva.':
+      'Enter the email you signed up with and we will send you a link to choose a new password.',
+    'Enviar enlace': 'Send link',
+    'Enviando…': 'Sending…',
+    'Volver a iniciar sesión': 'Back to sign in',
+    'Si el correo corresponde a una cuenta registrada, te enviamos un enlace para restablecer la contraseña.':
+      'If the email matches a registered account, we have sent a link to reset the password.',
+    'Elegí una contraseña nueva': 'Choose a new password',
+    'Verificando el enlace…': 'Checking the link…',
+    'Contraseña nueva': 'New password',
+    'Repetir contraseña': 'Repeat password',
+    'Guardar contraseña': 'Save password',
+    'La contraseña debe tener al menos 8 caracteres.': 'The password must be at least 8 characters long.',
+    'El enlace no es válido o ya venció. Pedí uno nuevo.': 'The link is not valid or has expired. Request a new one.',
+    'Pedí uno nuevo': 'Request a new one',
+    '✓ Listo, tu contraseña quedó cambiada. Ya podés iniciar sesión.':
+      '✓ Done, your password has been changed. You can sign in now.',
+    'No se pudo cambiar la contraseña.': 'The password could not be changed.',
+    'No se pudo procesar el pedido.': 'The request could not be processed.',
+    'Ya pediste varios enlaces en la última hora. Esperá un rato antes de volver a intentar.':
+      'You have already requested several links in the last hour. Please wait before trying again.',
     /* Etiquetas accesibles (aria-label) */
     'Cerrar': 'Close',
     'Quitar conector': 'Remove connector',

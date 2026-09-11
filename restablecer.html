@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
+  <title>Nueva contraseña — E-Find</title>
+  <link rel="stylesheet" href="css/style.css">
+  <meta name="description" content="Elegí una contraseña nueva para tu cuenta de E-Find.">
+  <meta name="robots" content="noindex">
+  <meta property="og:title"       content="Nueva contraseña — E-Find">
+  <meta property="og:description" content="Elegí una contraseña nueva para tu cuenta de E-Find.">
+  <meta property="og:image"       content="https://efindapp.com/img/efind-dark.png">
+  <meta property="og:type"        content="website">
+  <meta name="twitter:card"       content="summary_large_image">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content page-enter">
+<div class="auth-wrap">
+
+  <!-- Branding -->
+  <div class="auth-brand anim-fade-up anim-d1">
+    <a href="index.html" style="display:inline-block;margin-bottom:.5rem">
+      <img src="img/efind-nav.png" alt="E-Find" class="brand-logo">
+    </a>
+    <p class="auth-tagline" data-i18n="auth_tagline">La red colaborativa de cargadores para vehículos eléctricos en Uruguay.</p>
+    <ul class="auth-features">
+      <li data-i18n="auth_feat1">Encontrá cargadores cerca de vos en tiempo real</li>
+      <li data-i18n="auth_feat2">Estimá el tiempo de carga de tu EV</li>
+      <li data-i18n="auth_feat3">Compartí puntos de carga con la comunidad</li>
+      <li data-i18n="auth_feat4">Alquilá tu cargador y generá ingresos</li>
+    </ul>
+    <div style="margin-top:auto;padding-top:1.5rem;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:.6rem">
+      <span style="font-size:.75rem;color:rgba(255,255,255,.4)" data-i18n="footer_dev">Desarrollado por</span>
+      <img src="img/arandu-dark.png" alt="Arandú" style="height:26px;opacity:.7">
+    </div>
+  </div>
+
+  <!-- Panel -->
+  <div class="auth-panel anim-fade-up anim-d2">
+
+    <h1 class="admin-title" style="margin-bottom:.4rem">Elegí una contraseña nueva</h1>
+
+    <div id="alert-box" role="status" aria-live="polite" style="display:none"></div>
+
+    <!-- Se muestra mientras se valida el token del enlace -->
+    <div id="verificando" style="display:flex;align-items:center;gap:.6rem;color:var(--soft);font-size:.85rem;padding:1rem 0">
+      <span class="spinner"></span>Verificando el enlace…
+    </div>
+
+    <form id="res-form" style="display:none;flex-direction:column;gap:.9rem" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="pwd">Contraseña nueva</label>
+        <div class="input-pwd">
+          <input type="password" id="pwd" class="form-input" placeholder="••••••••"
+                 autocomplete="new-password" required>
+          <button type="button" class="pwd-toggle" onclick="togglePwd('pwd',this)">Ver</button>
+        </div>
+        <span class="form-hint">Mínimo 8 caracteres.</span>
+        <span class="form-error" id="err-pwd">La contraseña debe tener al menos 8 caracteres.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="pwd2">Repetir contraseña</label>
+        <div class="input-pwd">
+          <input type="password" id="pwd2" class="form-input" placeholder="••••••••"
+                 autocomplete="new-password" required>
+          <button type="button" class="pwd-toggle" onclick="togglePwd('pwd2',this)">Ver</button>
+        </div>
+        <span class="form-error" id="err-pwd2">Las contraseñas no coinciden.</span>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--full" id="btn-guardar">
+        Guardar contraseña
+      </button>
+    </form>
+
+    <p style="font-size:.85rem;color:var(--soft);text-align:center">
+      <a href="login.html" style="font-weight:700">Volver a iniciar sesión</a>
+    </p>
+  </div>
+</div>
+</main>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/icons.js"></script>
+<script src="js/i18n.js?v=3"></script>
+<script src="js/auth.js?v=2"></script>
+<script>
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+
+function togglePwd(id, btn) {
+  const i = document.getElementById(id);
+  i.type = i.type === 'password' ? 'text' : 'password';
+  btn.textContent = i.type === 'password' ? I18N.t('pwd_ver') : I18N.t('pwd_ocultar');
+}
+
+/* Se valida el token antes de mostrar el formulario, para no hacer que el
+   usuario elija una contraseña y recién ahí enterarse de que el enlace venció. */
+(async () => {
+  const json = await apiFetch(`/api/restablecer.php?token=${encodeURIComponent(TOKEN)}`)
+                     .catch(() => ({ ok: false }));
+  document.getElementById('verificando').style.display = 'none';
+
+  if (json.ok && json.data.valido) {
+    document.getElementById('res-form').style.display = 'flex';
+  } else {
+    showAlert('alert-box',
+      'El enlace no es válido o ya venció. <a href="recuperar.html" style="font-weight:700">Pedí uno nuevo</a>.',
+      'error');
+  }
+  I18N.apply(false);
+})();
+
+document.getElementById('res-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const pwd  = document.getElementById('pwd').value;
+  const pwd2 = document.getElementById('pwd2').value;
+  const corta      = pwd.length < 8;
+  const noCoincide = pwd !== pwd2;
+
+  document.getElementById('err-pwd').classList.toggle('show', corta);
+  document.getElementById('err-pwd2').classList.toggle('show', noCoincide);
+  if (corta || noCoincide) return;
+
+  const btn = document.getElementById('btn-guardar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Guardando…';
+
+  const json = await apiFetch('/api/restablecer.php', 'POST', { token: TOKEN, password: pwd })
+                     .catch(() => ({ ok: false, error: 'Error de conexión con el servidor.' }));
+
+  if (json.ok) {
+    document.getElementById('res-form').style.display = 'none';
+    showAlert('alert-box', '✓ Listo, tu contraseña quedó cambiada. Ya podés iniciar sesión.', 'success');
+    setTimeout(() => location.href = 'login.html', 2500);
+  } else {
+    btn.disabled = false;
+    btn.textContent = I18N.autoT('Guardar contraseña');
+    showAlert('alert-box', '✗ ' + (json.error || 'No se pudo cambiar la contraseña.'), 'error');
+  }
+  I18N.apply(false);
+});
+</script>
+</body>
+</html>

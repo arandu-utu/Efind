@@ -12,4 +12,7 @@ Thumbs.db
 sol_preview.html
 
 # Credenciales del servidor — nunca deben subirse al repo
-includes/
+# (db.php, auth.php y mail_config.php sólo existen en el servidor)
+includes/*
+# El cliente SMTP no tiene secretos: lee la config de mail_config.php
+!includes/smtp.php
