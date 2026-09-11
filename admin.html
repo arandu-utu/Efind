@@ -107,10 +107,10 @@ let reportes = [];
 async function initDashboard() {
   try {
     const [sRes, rRes, reRes, eRes] = await Promise.all([
-      fetch('/api/stats.php').then(r => r.json()),
-      fetch('/api/reportes.php').then(r => r.json()),
-      fetch('/api/resenas.php').then(r => r.json()),
-      fetch('/api/estaciones.php?limit=5').then(r => r.json()),
+      apiFetch('/api/stats.php'),
+      apiFetch('/api/reportes.php'),
+      apiFetch('/api/resenas.php'),
+      apiFetch('/api/estaciones.php?limit=5'),
     ]);
 
     if (sRes.ok)  renderStats(sRes.data);
@@ -208,11 +208,7 @@ function renderResenas() {
 }
 
 async function modResena(id, estado) {
-  const res = await fetch('/api/resenas.php', {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ id, estado }),
-  }).then(r => r.json());
+  const res = await apiFetch('/api/resenas.php', 'PATCH', { id, estado });
   if (res.ok) {
     const item = resenas.find(x => x.id === id);
     if (item) item.estado = estado;
@@ -260,22 +256,14 @@ async function resolverReporte(id, puntoCargaId) {
 
   // Si el admin eligió un estado, aplicarlo al cargador primero
   if (nuevoEstado) {
-    const rEstado = await fetch('/api/estado.php', {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ punto_carga_id: puntoCargaId, estado: nuevoEstado }),
-    }).then(r => r.json());
+    const rEstado = await apiFetch('/api/estado.php', 'PATCH', { punto_carga_id: puntoCargaId, estado: nuevoEstado });
     if (!rEstado.ok) {
       alert('No se pudo actualizar el estado del cargador: ' + (rEstado.error || ''));
       return;
     }
   }
 
-  const res = await fetch('/api/reportes.php', {
-    method: 'PATCH',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ id }),
-  }).then(r => r.json());
+  const res = await apiFetch('/api/reportes.php', 'PATCH', { id });
   if (res.ok) {
     const item = reportes.find(x => x.id === id);
     if (item) item.resuelto = 1;
@@ -308,8 +296,7 @@ async function sincronizarUTE() {
   estadoEl.textContent = '';
 
   try {
-    const res  = await fetch('/api/ute-sync.php', { method: 'POST' });
-    const json = await res.json();
+    const json = await apiFetch('/api/ute-sync.php', 'POST');
     if (json.ok) {
       const d = json.data;
       estadoEl.textContent = `✓ ${d.creados} nuevas, ${d.actualizados} actualizadas (de ${d.total_ute} en UTE).`;

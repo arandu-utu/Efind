@@ -189,14 +189,11 @@
   async function enviarCalificacion() {
     if (_puntos === 0) { alert(I18N.autoT('Seleccioná una puntuación antes de enviar.')); return; }
     if (!window._txPropietarioId) return;
-    await fetch('/api/calificaciones.php', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        para_usuario_id: window._txPropietarioId, transaccion_id: window._txId,
-        puntos: _puntos, comentario: document.getElementById('rating-comentario').value.trim(),
-      }),
+    await apiFetch('/api/calificaciones.php', 'POST', {
+      para_usuario_id: window._txPropietarioId, transaccion_id: window._txId,
+      puntos: _puntos, comentario: document.getElementById('rating-comentario').value.trim(),
     }).catch(()=>{});
-    fetch('/api/reservas.php', { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: window._txId }) }).catch(()=>{});
+    apiFetch('/api/reservas.php', 'PATCH', { id: window._txId }).catch(()=>{});
     document.getElementById('rating-section').innerHTML =
       '<p style="color:var(--green);font-weight:600;text-align:center;padding:.75rem">✓ ¡Gracias por tu calificación!</p>';
   }
@@ -210,7 +207,7 @@ let C = null, calcActual = null;
 
 (async () => {
   try {
-    const r = await fetch(`/api/estacion.php?id=${ID}`).then(r => r.json());
+    const r = await apiFetch(`/api/estacion.php?id=${ID}`);
     if (!r.ok) { location.href = 'index.html'; return; }
     C = {
       id: r.data.id, nombre: r.data.nombre, direccion: r.data.direccion || 'Sin dirección registrada',
@@ -231,7 +228,7 @@ async function init() {
 
   /* Vehículos del usuario */
   const sel  = document.getElementById('sel-vehiculo');
-  const vehs = await fetch('/api/vehiculos.php').then(r => r.json()).then(j => j.ok ? j.data : []).catch(() => []);
+  const vehs = await apiFetch('/api/vehiculos.php').then(j => j.ok ? j.data : []).catch(() => []);
   vehs.forEach(v => {
     const o = document.createElement('option');
     o.value = v.capacidad_kwh;
@@ -313,10 +310,9 @@ function procesarPago() {
 }
 
 async function pagar() {
-  const res = await fetch('/api/pagos.php', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ punto_carga_id: C.id, capacidad_kwh: calcActual.cap, soc_pct: calcActual.soc, potencia_kw: calcActual.pot }),
-  }).then(r => r.json()).catch(() => ({ ok:false }));
+  const res = await apiFetch('/api/pagos.php', 'POST',
+    { punto_carga_id: C.id, capacidad_kwh: calcActual.cap, soc_pct: calcActual.soc, potencia_kw: calcActual.pot }
+  ).catch(() => ({ ok:false }));
 
   if (!res.ok) {
     const al = document.getElementById('pago-alert');

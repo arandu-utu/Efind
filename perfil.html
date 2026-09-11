@@ -165,7 +165,7 @@ if (U.empresa) {
 
 /* Tab Calificaciones + estrellas del sidebar (misma fuente, un solo fetch) */
 async function renderCalificaciones() {
-  const j = await fetch('/api/calificaciones.php').then(r=>r.json()).catch(()=>({ok:false}));
+  const j = await apiFetch('/api/calificaciones.php').catch(()=>({ok:false}));
   const { promedio=null, total=0, calificaciones=[] } = j.ok ? j.data : {};
   document.getElementById('user-stars-sidebar').innerHTML = renderStars(promedio, total);
 
@@ -214,8 +214,7 @@ function switchTab(n, btn) {
 async function renderVehiculos() {
   const el = document.getElementById('lista-vehiculos');
   try {
-    const res  = await fetch('/api/vehiculos.php');
-    const json = await res.json();
+    const json = await apiFetch('/api/vehiculos.php');
     const vehs = json.ok ? json.data : [];
     el.innerHTML = vehs.length ? `
       <table class="data-table">
@@ -244,12 +243,7 @@ async function agregarVehiculo() {
   if (!marca || !modelo || !cap) { alert(I18N.autoT('Completá todos los campos.')); return; }
 
   try {
-    const res  = await fetch('/api/vehiculos.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ marca, modelo, capacidad_kwh: cap, tipo_conector }),
-    });
-    const json = await res.json();
+    const json = await apiFetch('/api/vehiculos.php', 'POST', { marca, modelo, capacidad_kwh: cap, tipo_conector });
     if (!json.ok) { alert(json.error || 'No se pudo guardar el vehículo.'); return; }
     document.getElementById('v-marca').value  = '';
     document.getElementById('v-modelo').value = '';
@@ -263,8 +257,7 @@ async function agregarVehiculo() {
 async function eliminarVehiculo(id) {
   if (!confirm(I18N.autoT('¿Eliminar este vehículo?'))) return;
   try {
-    const res  = await fetch(`/api/vehiculos.php?id=${id}`, { method: 'DELETE' });
-    const json = await res.json();
+    const json = await apiFetch(`/api/vehiculos.php?id=${id}`, 'DELETE');
     if (!json.ok) { alert(json.error || 'No se pudo eliminar.'); return; }
     renderVehiculos();
   } catch {
@@ -276,7 +269,7 @@ async function eliminarVehiculo(id) {
 async function renderMisCargadores() {
   const el = document.getElementById('lista-mis-cargadores');
   const badgeMap = {disponible:'badge-green',ocupado:'badge-orange',sin_servicio:'badge-gray'};
-  const lista = await fetch('/api/estaciones.php').then(r=>r.json()).then(j=>j.ok?j.data.filter(c=>c.propietario_id===U.id):[]).catch(()=>[]);
+  const lista = await apiFetch('/api/estaciones.php').then(j=>j.ok?j.data.filter(c=>c.propietario_id===U.id):[]).catch(()=>[]);
   el.innerHTML = lista.length ? `
     <table class="data-table">
       <thead><tr><th>Nombre</th><th>Estado</th><th>Potencia</th><th></th></tr></thead>
@@ -295,7 +288,7 @@ async function renderMisCargadores() {
 /* Historial */
 async function renderHistorial() {
   const el = document.getElementById('lista-trans');
-  const trans = await fetch('/api/reservas.php').then(r=>r.json()).then(j=>j.ok?j.data:[]).catch(()=>[]);
+  const trans = await apiFetch('/api/reservas.php').then(j=>j.ok?j.data:[]).catch(()=>[]);
   el.innerHTML = trans.length ? `
     <table class="data-table">
       <thead><tr><th>Recibo</th><th>Cargador</th><th>kWh</th><th>Total</th><th>Fecha</th></tr></thead>

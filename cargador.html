@@ -104,8 +104,7 @@ let C = null;   // se rellena con datos de la API
   if (!ID) { mostrarError('ID de cargador no especificado.'); return; }
 
   try {
-    const res  = await fetch(`/api/estacion.php?id=${ID}`);
-    const json = await res.json();
+    const json = await apiFetch(`/api/estacion.php?id=${ID}`);
 
     if (!json.ok) { mostrarError(json.error || 'Cargador no encontrado.'); return; }
 
@@ -149,8 +148,7 @@ let C = null;   // se rellena con datos de la API
 
 async function cargarResenas() {
   try {
-    const res  = await fetch(`/api/resenas.php?punto_carga_id=${ID}`);
-    const json = await res.json();
+    const json = await apiFetch(`/api/resenas.php?punto_carga_id=${ID}`);
     if (json.ok) {
       C.resenas = json.data.map(r => ({
         usuario:   r.usuario_nombre,
@@ -379,16 +377,11 @@ async function enviarResena() {
     return;
   }
   try {
-    const res = await fetch('/api/resenas.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        punto_carga_id: C.id,
-        estrellas: estrellasSel,
-        texto: document.getElementById('txt-resena').value || '',
-      }),
+    const json = await apiFetch('/api/resenas.php', 'POST', {
+      punto_carga_id: C.id,
+      estrellas: estrellasSel,
+      texto: document.getElementById('txt-resena').value || '',
     });
-    const json = await res.json();
     cerrarResena();
     if (json.ok) {
       mostrarFeedback('crowd-feedback', '✓ Reseña enviada. Se va a publicar cuando un admin la apruebe.', 'success');
@@ -423,16 +416,11 @@ async function enviarReporte() {
   }
   const desc = document.getElementById('txt-reporte').value;
   try {
-    const res  = await fetch('/api/reportes.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        punto_carga_id: C.id,
-        tipo,
-        descripcion: desc || null,
-      }),
+    const json = await apiFetch('/api/reportes.php', 'POST', {
+      punto_carga_id: C.id,
+      tipo,
+      descripcion: desc || null,
     });
-    const json = await res.json();
     cerrarReporte();
     if (json.ok) {
       mostrarFeedback('crowd-feedback', '✓ Reporte enviado, gracias por contribuir.', 'success');
@@ -448,46 +436,33 @@ async function enviarReporte() {
 /* ── Crowdsourcing: se envían como reportes, igual que "Reportar problema".
      Un admin los revisa y resuelve desde el panel (no se sobreescribe el
      estado directo, para mantener la moderación existente). ── */
-async function reportarEstado(estado) {
-  const labels = { disponible: 'Disponible', ocupado: 'Ocupado', sin_servicio: 'Fuera de servicio' };
+async function actualizarCampoCrowd(url, campo, valor, msgOk, msgErr, msgConexion) {
   try {
-    const res = await fetch('/api/estado.php', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ punto_carga_id: C.id, estado }),
-    });
-    const json = await res.json();
+    const json = await apiFetch(url, 'PATCH', { punto_carga_id: C.id, [campo]: valor });
     if (json.ok) {
-      C.estado = estado;
-      renderPage();  // refresca el badge de estado en el acto
-      mostrarFeedback('crowd-feedback', `✓ Estado actualizado a "${labels[estado] || estado}".`, 'success');
+      C[campo] = valor;
+      renderPage(); // refresca el badge/cola en el acto
+      mostrarFeedback('crowd-feedback', msgOk, 'success');
     } else {
-      mostrarFeedback('crowd-feedback', json.error || 'Error al actualizar el estado.', 'warn');
+      mostrarFeedback('crowd-feedback', json.error || msgErr, 'warn');
     }
   } catch {
-    mostrarFeedback('crowd-feedback', 'Error de conexión al actualizar el estado.', 'warn');
+    mostrarFeedback('crowd-feedback', msgConexion, 'warn');
   }
 }
 
-async function reportarCola() {
+function reportarEstado(estado) {
+  const labels = { disponible: 'Disponible', ocupado: 'Ocupado', sin_servicio: 'Fuera de servicio' };
+  actualizarCampoCrowd('/api/estado.php', 'estado', estado,
+    `✓ Estado actualizado a "${labels[estado] || estado}".`,
+    'Error al actualizar el estado.', 'Error de conexión al actualizar el estado.');
+}
+
+function reportarCola() {
   const cola = +document.getElementById('sel-cola').value;
-  try {
-    const res = await fetch('/api/cola.php', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ punto_carga_id: C.id, cola }),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      C.cola = cola;
-      renderPage();  // refresca "Sin espera" / "N vehículos en cola" en el acto
-      mostrarFeedback('crowd-feedback', `✓ Cola actualizada a ${cola} vehículo${cola!==1?'s':''}.`, 'success');
-    } else {
-      mostrarFeedback('crowd-feedback', json.error || 'Error al actualizar la cola.', 'warn');
-    }
-  } catch {
-    mostrarFeedback('crowd-feedback', 'Error de conexión al actualizar la cola.', 'warn');
-  }
+  actualizarCampoCrowd('/api/cola.php', 'cola', cola,
+    `✓ Cola actualizada a ${cola} vehículo${cola!==1?'s':''}.`,
+    'Error al actualizar la cola.', 'Error de conexión al actualizar la cola.');
 }
 
 function mostrarFeedback(elId, msg, tipo) {

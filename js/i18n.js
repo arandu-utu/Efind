@@ -416,9 +416,7 @@ window.I18N = {
     'Procesando…': 'Processing…',
   },
 
-  get() {
-    return localStorage.getItem(this.KEY) || 'es';
-  },
+  get() { return localStorage.getItem(this.KEY) || 'es'; },
 
   t(key) {
     const lang = this.get();
@@ -480,9 +478,7 @@ window.I18N = {
     this.apply();
   },
 
-  toggle() {
-    this.set(this.get() === 'es' ? 'en' : 'es');
-  },
+  toggle() { this.set(this.get() === 'es' ? 'en' : 'es'); },
 };
 
 document.addEventListener('DOMContentLoaded', () => {

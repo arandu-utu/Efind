@@ -221,12 +221,7 @@ document.getElementById('reg-form').addEventListener('submit', e => {
   btn.innerHTML = '<span class="spinner"></span> Creando cuenta…';
 
   // Registro con la API real
-  fetch('/api/registro.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nombre, email, password: pwd, rol: rolActual, ci, empresa }),
-  })
-  .then(r => r.json())
+  apiFetch('/api/registro.php', 'POST', { nombre, email, password: pwd, rol: rolActual, ci, empresa })
   .then(json => {
     if (json.ok) {
       // Guardar en localStorage para que la navbar lo lea

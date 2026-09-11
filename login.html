@@ -134,12 +134,7 @@ document.getElementById('login-form').addEventListener('submit', e => {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Ingresando…';
 
-  fetch('/api/login.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: pwd }),
-  })
-  .then(r => r.json())
+  apiFetch('/api/login.php', 'POST', { email, password: pwd })
   .then(json => {
     if (json.ok) {
       localStorage.setItem(Auth.KEY, JSON.stringify(json.data));

@@ -23,7 +23,7 @@ const Auth = {
     if (!u) return false;
     if (role === 'auth') return true;
     // Soporta tanto rol_id numérico (API real) como string (mock legacy)
-    if (role === 'admin')     return u.rol_id === 1 || u.rol === 'admin';
+    if (role === 'admin')       return u.rol_id === 1 || u.rol === 'admin' || u.rol === 'moderador';
     if (role === 'propietario') return u.rol_id === 3 || u.rol === 'propietario';
     return u.rol === role;
   },
@@ -33,6 +33,16 @@ const Auth = {
     return u ? roles.some(r => this.is(r)) : false;
   },
 };
+
+/* ── Fetch a /api/*.php con body JSON, devuelve la respuesta ya parseada ── */
+function apiFetch(url, method = 'GET', body) {
+  const opts = { method };
+  if (body !== undefined) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(url, opts).then(r => r.json());
+}
 
 /* ── Escapar HTML antes de insertar texto de usuario con innerHTML ──── */
 function escapeHtml(str) {
@@ -58,7 +68,7 @@ function validarRUT(rut) {
 /* ── Inyección dinámica de navbar/footer ─────────────────────── */
 function renderNavbar() {
   const u = Auth.get();
-  const isAdmin = u && (u.rol_id === 1 || u.rol === 'admin' || u.rol === 'moderador');
+  const isAdmin = Auth.is('admin');
 
   const nav = document.getElementById('navbar');
   if (!nav) return;
@@ -142,12 +152,7 @@ function requireAuth(redirectTo = 'login.html') {
 
 /* ── Guard: redirige si no es admin/moderador ────────────────── */
 function requireAdmin(redirectTo = 'index.html') {
-  const u = Auth.get();
-  const isAdmin = u && (u.rol_id === 1 || u.rol === 'admin' || u.rol === 'moderador');
-  if (!isAdmin) {
-    location.href = redirectTo;
-    return false;
-  }
+  if (!Auth.is('admin')) { location.href = redirectTo; return false; }
   return true;
 }
 

@@ -94,7 +94,7 @@ let usuarios = [];
 
 /* ── Carga inicial ─────────────────────────────────────────────── */
 async function init() {
-  const res = await fetch('/api/usuarios.php').then(r => r.json());
+  const res = await apiFetch('/api/usuarios.php');
   if (!res.ok) { console.error('Error al cargar usuarios:', res.error); return; }
   usuarios = res.data;
   renderTabla();
@@ -159,37 +159,26 @@ function renderTabla() {
 }
 
 /* ── Acciones ───────────────────────────────────────────────────── */
-async function cambiarRol(id, rol_id) {
-  const res = await fetch('/api/usuarios.php', {
-    method: 'PATCH',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ id, rol_id }),
-  }).then(r => r.json());
+async function patchUsuario(id, campo, valor, msgOk, tipoOk = 'success') {
+  const res = await apiFetch('/api/usuarios.php', 'PATCH', { id, [campo]: valor });
   if (res.ok) {
     const u = usuarios.find(x => +x.id === id);
-    if (u) u.rol_id = rol_id;
-    mostrarAlerta(`✓ Rol actualizado a "${ROLES_LABEL[rol_id]}".`, 'success');
+    if (u) u[campo] = valor;
+    mostrarAlerta(msgOk, tipoOk);
     renderTabla();
   } else {
     mostrarAlerta('Error: ' + res.error, 'warn');
   }
 }
 
-async function toggleActivo(id) {
+function cambiarRol(id, rol_id) {
+  patchUsuario(id, 'rol_id', rol_id, `✓ Rol actualizado a "${ROLES_LABEL[rol_id]}".`);
+}
+
+function toggleActivo(id) {
   const u      = usuarios.find(x => +x.id === id);
-  const activo = u ? !+u.activo : true;
-  const res = await fetch('/api/usuarios.php', {
-    method: 'PATCH',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ id, activo }),
-  }).then(r => r.json());
-  if (res.ok) {
-    if (u) u.activo = activo ? 1 : 0;
-    mostrarAlerta(`✓ Usuario ${activo ? 'activado' : 'suspendido'}.`, activo ? 'success' : 'warn');
-    renderTabla();
-  } else {
-    mostrarAlerta('Error: ' + res.error, 'warn');
-  }
+  const activo = u ? (!+u.activo ? 1 : 0) : 1;
+  patchUsuario(id, 'activo', activo, `✓ Usuario ${activo ? 'activado' : 'suspendido'}.`, activo ? 'success' : 'warn');
 }
 
 function mostrarAlerta(msg, tipo) {

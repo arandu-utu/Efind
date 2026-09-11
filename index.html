@@ -339,8 +339,7 @@ leyenda.addTo(map);
 // ── Carga inicial de datos (E-Find + UTE sincronizadas, una sola API) ──
 async function cargarEstaciones() {
   try {
-    const res  = await fetch('/api/estaciones.php');
-    const json = await res.json();
+    const json = await apiFetch('/api/estaciones.php');
     if (json.ok) {
       todasEstaciones = json.data;
       console.info(`EfindAPI: ${todasEstaciones.length} estaciones cargadas.`);

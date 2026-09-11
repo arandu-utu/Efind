@@ -287,12 +287,7 @@ function guardar() {
     conectores: conectores.map(c => ({...c})),
   };
 
-  fetch('/api/cargadores.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  .then(r => r.json())
+  apiFetch('/api/cargadores.php', 'POST', payload)
   .then(json => {
     if (json.ok) {
       document.getElementById('panel-3').style.display = 'none';
