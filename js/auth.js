@@ -44,6 +44,16 @@ function apiFetch(url, method = 'GET', body) {
   return fetch(url, opts).then(r => r.json());
 }
 
+/* ── Muestra un <div class="alert"> ya existente en la página ────────
+   ocultarMs > 0 lo vuelve a esconder solo pasado ese tiempo. */
+function showAlert(id, msg, tipo = 'error', ocultarMs = 0) {
+  const el = document.getElementById(id);
+  el.className = `alert alert-${tipo}`;
+  el.innerHTML = msg;
+  el.style.display = 'flex';
+  if (ocultarMs) setTimeout(() => el.style.display = 'none', ocultarMs);
+}
+
 /* ── Escapar HTML antes de insertar texto de usuario con innerHTML ──── */
 function escapeHtml(str) {
   const d = document.createElement('div');

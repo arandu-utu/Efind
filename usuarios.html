@@ -181,13 +181,7 @@ function toggleActivo(id) {
   patchUsuario(id, 'activo', activo, `✓ Usuario ${activo ? 'activado' : 'suspendido'}.`, activo ? 'success' : 'warn');
 }
 
-function mostrarAlerta(msg, tipo) {
-  const el = document.getElementById('alert-accion');
-  el.className = `alert alert-${tipo}`;
-  el.innerHTML = msg;
-  el.style.display = 'flex';
-  setTimeout(() => el.style.display='none', 3000);
-}
+function mostrarAlerta(msg, tipo) { showAlert('alert-accion', msg, tipo, 3000); }
 
 init();
 </script>

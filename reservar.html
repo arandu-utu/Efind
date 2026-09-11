@@ -133,7 +133,7 @@
       <div class="rate-form">
         <h4>¿Cómo fue tu experiencia con el propietario?</h4>
         <div class="star-picker" id="star-picker">
-          <!-- Soles de Mayo — se populan dinámicamente en initSolPicker() -->
+          <!-- Soles de Mayo — se populan dinámicamente en crearSolPicker() -->
         </div>
         <textarea id="rating-comentario" class="form-textarea" rows="2"
           placeholder="Comentario opcional…" style="margin-bottom:.75rem"></textarea>
@@ -152,46 +152,14 @@
 <script src="js/auth.js?v=2"></script>
 <script>
   /* ── Calificación post-pago ─────────────────────────────────── */
-  let _puntos = 0;
-
-  /* Inserta soles SVG en el picker (requiere solSVG de mock-data.js) */
-  function initSolPicker() {
-    const picker = document.getElementById('star-picker');
-    if (!picker) return;
-    picker.innerHTML = [1,2,3,4,5].map(v =>
-      `<span class="sp-star" data-val="${v}" onclick="pickStar(${v})"
-             onmouseenter="hoverStar(${v})" onmouseleave="unhoverStar()"
-             style="color:#C8D3DF">${solSVG(30)}</span>`
-    ).join('');
-  }
-
-  function pickStar(val) {
-    _puntos = val;
-    document.querySelectorAll('.sp-star').forEach(s => {
-      const v = +s.dataset.val;
-      s.style.color = v <= val ? '#F5B800' : '#C8D3DF';
-      s.style.transform = v <= val ? 'scale(1.08)' : 'scale(1)';
-    });
-  }
-
-  function hoverStar(val) {
-    document.querySelectorAll('.sp-star').forEach(s => {
-      s.style.color = +s.dataset.val <= val ? '#FFCC30' : '#C8D3DF';
-    });
-  }
-  function unhoverStar() {
-    document.querySelectorAll('.sp-star').forEach(s => {
-      const v = +s.dataset.val;
-      s.style.color = v <= _puntos ? '#F5B800' : '#C8D3DF';
-    });
-  }
+  let pickerCalificacion = null;
 
   async function enviarCalificacion() {
-    if (_puntos === 0) { alert(I18N.autoT('Seleccioná una puntuación antes de enviar.')); return; }
+    if (!pickerCalificacion?.valor) { alert(I18N.autoT('Seleccioná una puntuación antes de enviar.')); return; }
     if (!window._txPropietarioId) return;
     await apiFetch('/api/calificaciones.php', 'POST', {
       para_usuario_id: window._txPropietarioId, transaccion_id: window._txId,
-      puntos: _puntos, comentario: document.getElementById('rating-comentario').value.trim(),
+      puntos: pickerCalificacion.valor, comentario: document.getElementById('rating-comentario').value.trim(),
     }).catch(()=>{});
     apiFetch('/api/reservas.php', 'PATCH', { id: window._txId }).catch(()=>{});
     document.getElementById('rating-section').innerHTML =
@@ -330,7 +298,7 @@ async function pagar() {
   document.getElementById('panel-pago').style.display   = 'none';
   document.getElementById('panel-recibo').style.display = '';
   document.getElementById('reserved-check-icon').innerHTML = ICONS.reservedCheck(64);
-  initSolPicker();
+  pickerCalificacion = crearSolPicker('star-picker', 'sp-star', 30);
 
   const total = res.data.monto_total;
   document.getElementById('r-nro').textContent    = res.data.recibo;

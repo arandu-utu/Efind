@@ -163,12 +163,9 @@ document.getElementById('pwd2').addEventListener('input', function() {
   document.getElementById('hint-pwd2').style.display = (!match && this.value) ? 'block' : 'none';
 });
 
-function mostrarAlert(msg, tipo='error') {
-  const el = document.getElementById('alert-box');
-  el.className = `alert alert-${tipo}`;
-  el.innerHTML = msg;
-  el.style.display = 'flex';
-  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function mostrarAlert(msg, tipo) {
+  showAlert('alert-box', msg, tipo);
+  document.getElementById('alert-box').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 document.getElementById('reg-form').addEventListener('submit', e => {

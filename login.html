@@ -100,12 +100,7 @@ function togglePwd(id, btn) {
   btn.textContent = i.type === 'password' ? I18N.t('pwd_ver') : I18N.t('pwd_ocultar');
 }
 
-function mostrarAlert(msg, tipo = 'error') {
-  const el = document.getElementById('alert-box');
-  el.className = `alert alert-${tipo}`;
-  el.innerHTML = msg;
-  el.style.display = 'flex';
-}
+function mostrarAlert(msg, tipo) { showAlert('alert-box', msg, tipo); }
 
 document.getElementById('login-form').addEventListener('submit', e => {
   e.preventDefault();

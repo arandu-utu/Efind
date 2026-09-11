@@ -16,7 +16,6 @@
     .stars-display .s.on { color:#F5B800; }
     .stars-input { display:flex; gap:4px; }
     .stars-input .star { color:#C8D3DF; cursor:pointer; transition:color .15s, transform .15s; }
-    .stars-input .star.on { color:#F5B800; transform:scale(1.1); }
     .resena-item { padding:.75rem 0; border-bottom:1px solid var(--border); }
     .resena-item:last-child { border-bottom:none; }
     .data-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem .8rem; font-size:.88rem; }
@@ -55,7 +54,7 @@
     <div class="form-group" style="margin-bottom:.85rem">
       <label class="form-label">Calificación</label>
       <div class="stars-input" id="stars-input">
-        <!-- Soles de Mayo — populados por initReseñaPicker() -->
+        <!-- Soles de Mayo — populados por crearSolPicker() -->
       </div>
     </div>
     <div class="form-group" style="margin-bottom:.85rem">
@@ -173,26 +172,6 @@ function stars(n, max=5) {
   return Array.from({length:max}, (_,i) =>
     `<span class="s ${i<n?'on':''}">${solSVG(15)}</span>`
   ).join('');
-}
-
-function initReseñaPicker() {
-  const el = document.getElementById('stars-input');
-  if (!el) return;
-  el.innerHTML = [1,2,3,4,5].map(v =>
-    `<span class="star" data-v="${v}" onclick="setStar(${v})"
-           onmouseenter="hoverResena(${v})" onmouseleave="unhoverResena()"
-           style="color:#C8D3DF">${solSVG(28)}</span>`
-  ).join('');
-}
-function hoverResena(v) {
-  document.querySelectorAll('#stars-input .star').forEach(s => {
-    s.style.color = +s.dataset.v <= v ? '#FFCC30' : '#C8D3DF';
-  });
-}
-function unhoverResena() {
-  document.querySelectorAll('#stars-input .star').forEach(s => {
-    s.style.color = +s.dataset.v <= estrellasSel ? '#F5B800' : '#C8D3DF';
-  });
 }
 
 function promEstrellas(resenas) {
@@ -347,29 +326,19 @@ function renderPage() {
 }
 
 /* ── Modal reseña ──────────────────────────────────────────── */
-let estrellasSel = 0;
+let pickerResena = null;
 
 function abrirResena() {
   if (!U) { location.href = 'login.html'; return; }
-  estrellasSel = 0;
-  initReseñaPicker();
-  setStar(0);
+  pickerResena = crearSolPicker('stars-input', 'star', 28);
   document.getElementById('txt-resena').value = '';
   document.getElementById('resena-alert').style.display = 'none';
   document.getElementById('modal-resena').style.display = 'flex';
 }
 function cerrarResena() { document.getElementById('modal-resena').style.display = 'none'; }
 
-function setStar(n) {
-  estrellasSel = n;
-  document.querySelectorAll('#stars-input .star').forEach((s, i) => {
-    s.style.color = i < n ? '#F5B800' : '#C8D3DF';
-    s.style.transform = i < n ? 'scale(1.08)' : 'scale(1)';
-  });
-}
-
 async function enviarResena() {
-  if (!estrellasSel) {
+  if (!pickerResena?.valor) {
     const al = document.getElementById('resena-alert');
     al.className = 'alert alert-warn';
     al.innerHTML = 'Seleccioná una calificación.';
@@ -379,7 +348,7 @@ async function enviarResena() {
   try {
     const json = await apiFetch('/api/resenas.php', 'POST', {
       punto_carga_id: C.id,
-      estrellas: estrellasSel,
+      estrellas: pickerResena.valor,
       texto: document.getElementById('txt-resena').value || '',
     });
     cerrarResena();
@@ -465,13 +434,7 @@ function reportarCola() {
     'Error al actualizar la cola.', 'Error de conexión al actualizar la cola.');
 }
 
-function mostrarFeedback(elId, msg, tipo) {
-  const el = document.getElementById(elId);
-  el.className = `alert alert-${tipo}`;
-  el.innerHTML = msg;
-  el.style.display = 'flex';
-  setTimeout(() => el.style.display='none', 3000);
-}
+function mostrarFeedback(elId, msg, tipo) { showAlert(elId, msg, tipo, 3000); }
 </script>
 </body>
 </html>

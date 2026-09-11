@@ -194,7 +194,7 @@ function renderResenas() {
         <td>${escapeHtml(r.usuario_nombre)}</td>
         <td>${escapeHtml(r.cargador_nombre)}</td>
         <td><span style="display:inline-flex;align-items:center;gap:1px">
-          ${Array.from({length:5},(_,i)=>`<span style="color:${i<r.estrellas?'#F5B800':'#C8D3DF'}">${solSVG(14)}</span>`).join('')}
+          ${solesHTML(r.estrellas, 14)}
         </span></td>
         <td style="font-size:.82rem">${escapeHtml(r.texto)}</td>
         <td style="white-space:nowrap">

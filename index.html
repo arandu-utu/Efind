@@ -133,28 +133,32 @@ const COLORES = {
   sin_servicio: { fill: '#9E9E9E', border: '#6B6B6B' },
 };
 
+// ── Marcador Leaflet a partir de un SVG, con la sombra común ─
+function divIcono(svg, px) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))">${svg}</div>`,
+    iconSize:   [px, px],
+    iconAnchor: [px / 2, px / 2],
+  });
+}
+
 // ── Ícono E-Find (círculo = público, cuadrado = privado) ─────
 function crearIcono(estado, publica) {
   const c = COLORES[estado] || COLORES.sin_servicio;
   const shape = publica
     ? `<circle cx="12" cy="12" r="8" fill="${c.fill}" stroke="${c.border}" stroke-width="2"/>`
     : `<rect x="4" y="4" width="16" height="16" rx="3" fill="${c.fill}" stroke="${c.border}" stroke-width="2"/>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  return divIcono(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
     ${shape}
     <path d="M13.2 5.5L10 11h2.5l-.8 3.2L15 8.5h-2.5z" fill="white"/>
-  </svg>`;
-  return L.divIcon({
-    className: '',
-    html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))">${svg}</div>`,
-    iconSize:   [24, 24],
-    iconAnchor: [12, 12],
-  });
+  </svg>`, 24);
 }
 
 // ── Ícono UTE (diamante con "U") ─────────────────────────────
 function crearIconoUTE(estado) {
   const c = COLORES[estado] || COLORES.sin_servicio;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
+  return divIcono(`<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26">
     <g transform="translate(13,13) rotate(45)">
       <rect x="-8" y="-8" width="16" height="16" rx="2"
             fill="${c.fill}" stroke="#1B4F9C" stroke-width="2.5"/>
@@ -162,13 +166,7 @@ function crearIconoUTE(estado) {
     <text x="13" y="17" text-anchor="middle"
           font-family="Arial,sans-serif" font-weight="900"
           font-size="9" fill="white">U</text>
-  </svg>`;
-  return L.divIcon({
-    className: '',
-    html: `<div style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))">${svg}</div>`,
-    iconSize:   [26, 26],
-    iconAnchor: [13, 13],
-  });
+  </svg>`, 26);
 }
 
 // ── Estado E-Find ────────────────────────────────────────────

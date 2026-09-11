@@ -176,9 +176,8 @@ async function renderCalificaciones() {
     list.innerHTML = '';
     return;
   }
-  const stars = (n,px) => Array.from({length:5},(_,i)=>`<span style="color:${i<n?'#F5B800':'#C8D3DF'}">${solSVG(px)}</span>`).join('');
   block.innerHTML = `<div class="rating-summary">
-      <div><div class="rating-big-num">${promedio}</div><div class="rating-big-stars">${stars(Math.round(promedio),26)}</div></div>
+      <div><div class="rating-big-num">${promedio}</div><div class="rating-big-stars">${solesHTML(Math.round(promedio),26)}</div></div>
       <div><div style="font-weight:600;font-size:.9rem">Calificación promedio</div>
         <div class="rating-big-count">${total} calificación${total!==1?'es':''} recibida${total!==1?'s':''}</div></div>
     </div>`;
@@ -188,7 +187,7 @@ async function renderCalificaciones() {
       <div class="cal-body">
         <div class="cal-header">
           <span class="cal-name">${escapeHtml(c.de_nombre)}</span>
-          <span class="cal-stars">${stars(c.puntos,14)}</span>
+          <span class="cal-stars">${solesHTML(c.puntos,14)}</span>
           <span class="cal-date">${c.fecha}</span>
         </div>
         <div class="cal-tipo">${c.tipo==='propietario_a_cliente'?'Como cliente':'Como propietario'}</div>

@@ -45,17 +45,54 @@ function solSVG(px = 16) {
 }
 
 /**
+ * Fila de 5 soles de sólo lectura, coloreados con estilo inline.
+ * @param {number} n   — cuántos van encendidos (0-5)
+ * @param {number} px  — tamaño de cada sol
+ */
+function solesHTML(n, px = 15) {
+  return Array.from({length: 5}, (_, i) =>
+    `<span style="color:${i < n ? '#F5B800' : '#C8D3DF'}">${solSVG(px)}</span>`
+  ).join('');
+}
+
+/**
  * Renderiza estrellas como HTML.
  * @param {number|null} promedio  — valor 0-5 o null
  * @param {number}      total     — cantidad de calificaciones
  */
 function renderStars(promedio, total) {
   if (promedio === null || total === 0) return `<span class="user-rating user-rating--new">Nuevo</span>`;
-  const filled = Math.round(promedio);
-  const soles  = Array.from({length: 5}, (_, i) =>
-    `<span style="color:${i < filled ? '#F5B800' : '#C8D3DF'}">${solSVG(15)}</span>`
-  ).join('');
   return `<span class="user-soles" title="${promedio.toFixed(1)} / 5 (${total} calificaciones)"
-               style="display:inline-flex;align-items:center;gap:1px;vertical-align:middle">${soles}</span
+               style="display:inline-flex;align-items:center;gap:1px;vertical-align:middle">${solesHTML(Math.round(promedio))}</span
          ><span class="user-rating-count">${promedio.toFixed(1)}</span>`;
+}
+
+/**
+ * Picker de soles interactivo (reseñas en cargador.html, calificación en reservar.html).
+ * Rellena el contenedor y devuelve un objeto cuyo `.valor` refleja la selección actual.
+ * @param {string} contenedorId  — id del div que aloja los soles
+ * @param {string} clase         — clase de cada sol (la define el CSS de cada página)
+ * @param {number} px            — tamaño de cada sol
+ */
+function crearSolPicker(contenedorId, clase, px) {
+  const cont = document.getElementById(contenedorId);
+  if (!cont) return null;
+  const api = { valor: 0 };
+
+  const pintar = (hasta, color, conEscala) => cont.querySelectorAll('.' + clase).forEach(s => {
+    const activo = +s.dataset.v <= hasta;
+    s.style.color = activo ? color : '#C8D3DF';
+    if (conEscala) s.style.transform = activo ? 'scale(1.08)' : 'scale(1)';
+  });
+
+  cont.innerHTML = [1, 2, 3, 4, 5].map(v =>
+    `<span class="${clase}" data-v="${v}" style="color:#C8D3DF">${solSVG(px)}</span>`
+  ).join('');
+
+  cont.querySelectorAll('.' + clase).forEach(s => {
+    s.onclick      = () => { api.valor = +s.dataset.v; pintar(api.valor, '#F5B800', true); };
+    s.onmouseenter = () => pintar(+s.dataset.v, '#FFCC30', false);
+    s.onmouseleave = () => pintar(api.valor, '#F5B800', false);
+  });
+  return api;
 }
