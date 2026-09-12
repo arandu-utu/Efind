@@ -1,0 +1,9 @@
+# E-Find — configuración de Apache a nivel de directorio.
+#
+# Apache sirve los .js sin declarar charset, y el navegador entonces los
+# interpreta como ISO-8859-1: los acentos y emojis de js/i18n.js se ven
+# corruptos ("Iniciar sesi&oacute;n" y similares). Estas dos líneas lo arreglan.
+# Requiere AllowOverride All en el VirtualHost.
+
+AddDefaultCharset UTF-8
+AddCharset UTF-8 .js
