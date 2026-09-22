@@ -16,3 +16,7 @@ sol_preview.html
 includes/*
 # El cliente SMTP no tiene secretos: lee la config de mail_config.php
 !includes/smtp.php
+
+# Restos de migración, nunca deben ir al repo
+cloudflared-tmp/
+/*.sql
