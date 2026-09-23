@@ -5,25 +5,14 @@
  * POST  /api/resenas.php              → crear reseña (usuario autenticado)
  * PATCH /api/resenas.php              → moderar reseña (admin)
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
 try {
     $db = db_connect();
-
-    /* Crear tabla si no existe (sin FK para evitar problemas de charset/engine) */
-    $db->exec("CREATE TABLE IF NOT EXISTS resenas (
-        id             INT AUTO_INCREMENT PRIMARY KEY,
-        punto_carga_id INT NOT NULL,
-        usuario_id     INT NOT NULL,
-        usuario_nombre VARCHAR(100) NOT NULL,
-        estrellas      TINYINT NOT NULL,
-        texto          TEXT,
-        estado         ENUM('pendiente','aprobada','rechazada') DEFAULT 'pendiente',
-        fecha_creacion DATE DEFAULT NULL
-    )");
 
     $method = $_SERVER['REQUEST_METHOD'];
 
@@ -86,6 +75,13 @@ try {
 
         if (!$punto_carga_id || $estrellas < 1 || $estrellas > 5)
             throw new Exception('Datos inválidos: falta punto_carga_id o estrellas.');
+
+        /* Sin esta comprobación se podían crear reseñas de cargadores que no
+           existen, que después aparecen en la cola de moderación sin nada
+           que moderar. */
+        $stmt = $db->prepare("SELECT id FROM puntos_carga WHERE id = :id AND activo = 1");
+        $stmt->execute([':id' => $punto_carga_id]);
+        if (!$stmt->fetch()) throw new Exception('El punto de carga no existe o no está disponible.');
 
         $u = usuario_actual();
         $stmt = $db->prepare("

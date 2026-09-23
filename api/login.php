@@ -1,17 +1,6 @@
 <?php
-/* Cookie de sesión: Secure solo si la conexión real es HTTPS (túnel),
-   para no romper el acceso directo por HTTP en red local */
-$es_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-         || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
-
-session_set_cookie_params([
-    'lifetime' => 0,
-    'path'     => '/',
-    'secure'   => $es_https,
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 require_once '../includes/db.php';
 header('Content-Type: application/json');
 
@@ -38,15 +27,6 @@ function obtener_ip_real() {
 }
 
 $ip = obtener_ip_real();
-
-$pdo->exec("CREATE TABLE IF NOT EXISTS login_intentos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    ip VARCHAR(45) NOT NULL,
-    email VARCHAR(150) NOT NULL,
-    intentos INT NOT NULL DEFAULT 1,
-    ultimo_intento DATETIME NOT NULL,
-    UNIQUE KEY ip_email (ip, email)
-)");
 
 $LIMITE_INTENTOS = 5;
 $VENTANA_MINUTOS = 15;
@@ -87,6 +67,10 @@ if (!$user || !$user['activo'] || !password_verify($pass, $user['password_hash']
 
 /* Login correcto: limpiar contador de intentos */
 $pdo->prepare("DELETE FROM login_intentos WHERE ip = ? AND email = ?")->execute([$ip, $email]);
+
+/* Identificador nuevo antes de guardar los datos del usuario, para que un
+   identificador fijado de antemano por un tercero deje de ser válido. */
+renovar_sesion();
 
 $_SESSION['usuario_id'] = $user['id'];
 $_SESSION['nombre']     = $user['nombre'];

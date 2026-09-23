@@ -10,7 +10,8 @@
  * En la tabla se guarda sólo el SHA-256 del token, nunca el token en claro:
  * si alguien llegara a leer la base, no puede usar los tokens pendientes.
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/smtp.php';
@@ -38,18 +39,6 @@ try {
         echo json_encode(['ok' => false, 'error' => 'Ingresá un correo válido.']);
         exit;
     }
-
-    /* Tabla propia: no colisiona con ninguna de db/schema.sql. */
-    $db->exec("CREATE TABLE IF NOT EXISTS password_resets (
-        id          INT AUTO_INCREMENT PRIMARY KEY,
-        usuario_id  INT NOT NULL,
-        token_hash  CHAR(64) NOT NULL,
-        expira_en   DATETIME NOT NULL,
-        usado_en    DATETIME NULL,
-        creado_en   DATETIME NOT NULL,
-        INDEX idx_token (token_hash),
-        INDEX idx_usuario (usuario_id)
-    )");
 
     $stmt = $db->prepare("SELECT id, nombre FROM usuarios WHERE email = :email AND activo = 1");
     $stmt->execute([':email' => $email]);

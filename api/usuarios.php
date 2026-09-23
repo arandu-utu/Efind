@@ -8,7 +8,8 @@
  * navegador sólo se filtraría la página visible, que es justamente lo que no
  * se quiere cuando hay muchos usuarios.
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';

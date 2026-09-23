@@ -5,9 +5,15 @@
 --  Rev. 1.1 — 2026-08-11
 -- =====================================================
 
-DROP DATABASE IF EXISTS efind;
-CREATE DATABASE efind CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE efind;
+-- Este archivo NO crea ni selecciona la base de datos: la indica quien lo
+-- ejecuta. Antes incluia un DROP DATABASE que borraba la base entera, lo que
+-- convertia cualquier ejecucion contra el servidor equivocado en una perdida
+-- total de datos.
+--
+--   mysql -u root -p -e "CREATE DATABASE efind CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+--   mysql -u root -p efind < db/schema.sql
+--   mysql -u root -p efind < db/seed.sql
+--   mysql -u root -p efind < db/migraciones/001_integridad_up.sql
 
 -- -----------------------------------------------------
 -- ROLES
@@ -26,11 +32,14 @@ CREATE TABLE usuarios (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre         VARCHAR(80)  NOT NULL,
   email          VARCHAR(120) NOT NULL UNIQUE,
+  ci_rut         VARCHAR(20),   -- cedula si es particular, RUT si es empresa
+  empresa        VARCHAR(150),  -- razon social, solo cuando el rol es empresa
   password_hash  VARCHAR(255) NOT NULL,
   rol_id         TINYINT UNSIGNED NOT NULL DEFAULT 2,
   activo         TINYINT(1) NOT NULL DEFAULT 1,
   creado_en      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_ci_rut (ci_rut),
   FOREIGN KEY (rol_id) REFERENCES roles(id)
 ) ENGINE=InnoDB;
 
@@ -75,10 +84,13 @@ CREATE TABLE puntos_carga (
   direccion      VARCHAR(200) NOT NULL,
   ciudad         VARCHAR(80),
   departamento   VARCHAR(50),
+  horario        VARCHAR(60),                          -- texto libre: "24 h", "L-V 8-20"
+  costo_kwh      DECIMAL(6,2) NOT NULL DEFAULT 0,      -- 0 = cargador gratuito
   lat            DECIMAL(10,8) NOT NULL,
   lng            DECIMAL(11,8) NOT NULL,
   acceso         ENUM('publico','privado') NOT NULL DEFAULT 'publico',
   estado         ENUM('disponible','ocupado','sin_servicio') NOT NULL DEFAULT 'disponible',
+  cola           TINYINT UNSIGNED NOT NULL DEFAULT 0,  -- vehiculos esperando, reportado por usuarios
   fuente         ENUM('efind','ute') NOT NULL DEFAULT 'efind',
   propietario_id INT UNSIGNED,
   verificado     TINYINT(1) NOT NULL DEFAULT 0,
@@ -173,6 +185,100 @@ CREATE TABLE favoritos (
   PRIMARY KEY (usuario_id, punto_carga_id),
   FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE CASCADE,
   FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+-- -----------------------------------------------------
+-- TRANSACCIONES (cargas cobradas)
+-- Registro contable: no se borra. Por eso las claves hacia
+-- usuarios y puntos_carga son RESTRICT.
+-- -----------------------------------------------------
+CREATE TABLE transacciones (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  usuario_id     INT UNSIGNED  NOT NULL,
+  punto_carga_id INT UNSIGNED  NOT NULL,
+  propietario_id INT UNSIGNED,              -- nulo si el cargador no tiene dueno en E-Find
+  recibo         VARCHAR(30)   NOT NULL,
+  kwh            DECIMAL(6,2)  NOT NULL,
+  tiempo         VARCHAR(20),
+  monto_total    DECIMAL(10,2) NOT NULL DEFAULT 0,
+  comision       DECIMAL(10,2) NOT NULL DEFAULT 0,
+  calificado     TINYINT(1)    NOT NULL DEFAULT 0,
+  fecha          DATE          NOT NULL,
+  CONSTRAINT fk_transacciones_usuario     FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE RESTRICT,
+  CONSTRAINT fk_transacciones_punto_carga FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_transacciones_propietario FOREIGN KEY (propietario_id) REFERENCES usuarios(id)     ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+
+-- -----------------------------------------------------
+-- CALIFICACIONES entre usuarios
+-- uq_transaccion impide calificar dos veces la misma carga:
+-- cierra la carrera que la validacion en PHP no puede cerrar.
+-- -----------------------------------------------------
+CREATE TABLE calificaciones (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  de_usuario_id   INT UNSIGNED NOT NULL,
+  para_usuario_id INT UNSIGNED NOT NULL,
+  transaccion_id  INT UNSIGNED,             -- nulo solo en calificaciones anteriores a esta regla
+  puntos          TINYINT      NOT NULL,
+  comentario      TEXT,
+  tipo            VARCHAR(30)  NOT NULL,
+  fecha           DATE         NOT NULL,
+  UNIQUE KEY uq_transaccion (transaccion_id),
+  CONSTRAINT fk_calificaciones_transaccion  FOREIGN KEY (transaccion_id)  REFERENCES transacciones(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_calificaciones_autor        FOREIGN KEY (de_usuario_id)   REFERENCES usuarios(id)      ON DELETE RESTRICT,
+  CONSTRAINT fk_calificaciones_destinatario FOREIGN KEY (para_usuario_id) REFERENCES usuarios(id)      ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+
+-- -----------------------------------------------------
+-- RESENAS de puntos de carga (moderadas)
+-- -----------------------------------------------------
+CREATE TABLE resenas (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  punto_carga_id INT UNSIGNED NOT NULL,
+  usuario_id     INT UNSIGNED NOT NULL,
+  usuario_nombre VARCHAR(100) NOT NULL,
+  estrellas      TINYINT      NOT NULL,
+  texto          TEXT,
+  estado         ENUM('pendiente','aprobada','rechazada') DEFAULT 'pendiente',
+  fecha_creacion DATE DEFAULT NULL,
+  CONSTRAINT fk_resenas_punto_carga FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE RESTRICT,
+  CONSTRAINT fk_resenas_usuario     FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+
+-- -----------------------------------------------------
+-- TOKENS de recuperacion de contrasena
+-- Sin su usuario no significan nada: aca si corresponde CASCADE.
+-- -----------------------------------------------------
+CREATE TABLE password_resets (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  usuario_id INT UNSIGNED NOT NULL,
+  token_hash CHAR(64)     NOT NULL,
+  expira_en  DATETIME     NOT NULL,
+  usado_en   DATETIME     NULL,
+  creado_en  DATETIME     NOT NULL,
+  INDEX idx_token (token_hash),
+  INDEX idx_usuario (usuario_id),   -- InnoDB lo reutiliza para la clave foranea
+  CONSTRAINT fk_password_resets_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
+-- -----------------------------------------------------
+-- INTENTOS DE INGRESO fallidos (freno de fuerza bruta)
+-- Deliberadamente sin clave foranea: la mayoria de los intentos
+-- son contra correos que no corresponden a ningun usuario, que
+-- es justamente lo que interesa registrar.
+-- -----------------------------------------------------
+CREATE TABLE login_intentos (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ip             VARCHAR(45)  NOT NULL,
+  email          VARCHAR(150) NOT NULL,
+  intentos       INT          NOT NULL DEFAULT 1,
+  ultimo_intento DATETIME     NOT NULL,
+  UNIQUE KEY ip_email (ip, email)
 ) ENGINE=InnoDB;
 
 

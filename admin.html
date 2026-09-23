@@ -82,9 +82,10 @@
           <button id="btn-sync-ute" class="btn btn--outline btn--sm" onclick="sincronizarUTE()">Actualizar cargadores UTE</button>
         </div>
       </div>
+      <div id="alert-cargadores" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Nombre</th><th>Dirección</th><th>Estado</th><th>Conectores</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Dirección</th><th>Estado</th><th>Conectores</th><th>Acciones</th></tr></thead>
           <tbody id="tbody-cargadores"></tbody>
         </table>
       </div>
@@ -112,12 +113,11 @@ let paginaResenas  = 1;
 let paginaReportes = 1;
 
 async function initDashboard() {
-  const [sRes, eRes] = await Promise.all([
+  const [sRes] = await Promise.all([
     apiFetch('/api/stats.php').catch(() => ({ ok: false })),
-    apiFetch('/api/estaciones.php?limit=5').catch(() => ({ ok: false })),
+    cargarUltimosCargadores(),
   ]);
   if (sRes.ok) renderStats(sRes.data);
-  if (eRes.ok) renderCargadores(eRes.data);
 
   /* Cada lista se carga y se pagina por su cuenta, así moderar un ítem
      recarga sólo esa lista y no todo el dashboard. */
@@ -315,10 +315,38 @@ function renderCargadores(lista) {
     <td style="font-size:.82rem;color:var(--soft)">${c.acceso || ''}</td>
     <td><span class="badge ${badgeMap[c.estado]||''}">${c.estado}</span></td>
     <td style="font-size:.82rem">${tipos}</td>
-    <td><a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a></td>
+    <td style="white-space:nowrap">
+      <a href="cargador.html?id=${c.id}" class="btn btn--ghost btn--sm">Ver</a>
+      <button class="btn btn--warn btn--sm" onclick="ocultarCargador(${c.id}, this.dataset.nombre)"
+              data-nombre="${escapeHtml(c.nombre)}">Ocultar</button>
+    </td>
   </tr>`;
   }).join('');
   I18N.apply(false);
+}
+
+/* Ocultar del mapa público (HU-05). Se usa el campo activo, que ya existía:
+   el cargador deja de listarse, de poder reservarse y de poder reseñarse,
+   mientras que las cargas ya realizadas se conservan en el historial. */
+async function ocultarCargador(id, nombre) {
+  const ok = await confirmar(
+    `"${nombre}" va a dejar de aparecer en el mapa y no va a poder reservarse. Las cargas ya realizadas no se modifican.`,
+    { titulo: 'Ocultar cargador', aceptar: 'Ocultar', peligro: true });
+  if (!ok) return;
+
+  const res = await apiFetch('/api/cargadores.php', 'PATCH', { id })
+                    .catch(() => ({ ok: false, error: 'Error de conexión con el servidor.' }));
+  if (!res.ok) {
+    showAlert('alert-cargadores', res.error || 'No se pudo ocultar el cargador.', 'error', 5000);
+    return;
+  }
+  showAlert('alert-cargadores', `✓ "${nombre}" ya no aparece en el mapa público.`, 'success', 4000);
+  cargarUltimosCargadores();
+}
+
+async function cargarUltimosCargadores() {
+  const res = await apiFetch('/api/estaciones.php?limit=5').catch(() => ({ ok: false }));
+  if (res.ok) renderCargadores(res.data);
 }
 
 /* ── Sincronización manual de cargadores UTE ─────────────────── */
@@ -335,7 +363,7 @@ async function sincronizarUTE() {
       const d = json.data;
       estadoEl.textContent = `✓ ${d.creados} nuevas, ${d.actualizados} actualizadas (de ${d.total_ute} en UTE).`;
       estadoEl.style.color = 'var(--success, #2A8F59)';
-      initDashboard(); // refrescar la tabla de "últimos cargadores"
+      cargarUltimosCargadores();
     } else {
       estadoEl.textContent = '✗ ' + (json.error || 'Error al sincronizar.');
       estadoEl.style.color = 'var(--warn, #C4532A)';

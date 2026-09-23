@@ -1,9 +1,16 @@
 <?php
 /**
- * E-Find — Alta de puntos de carga
- * POST /api/cargadores.php  → crear cargador + sus conectores (usuario autenticado)
+ * E-Find — Puntos de carga
+ * POST  /api/cargadores.php        → crear cargador + sus conectores (usuario autenticado)
+ * PATCH /api/cargadores.php {id}   → ocultar un cargador del mapa público (admin)
+ *
+ * La ocultación cumple la historia HU-05: retirar de la vista pública los
+ * cargadores inexistentes o fraudulentos para que no puedan reservarse. Usa el
+ * campo `activo` que ya existía, sin introducir un estado nuevo. No afecta al
+ * historial: las transacciones registran cargas ya realizadas.
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
@@ -11,6 +18,26 @@ require_once '../includes/auth.php';
 try {
     $db     = db_connect();
     $method = $_SERVER['REQUEST_METHOD'];
+
+    /* ── PATCH: ocultar del mapa público (HU-05) ──────────────── */
+    if ($method === 'PATCH' || $method === 'PUT') {
+        /* Hoy la moderación la ejerce el administrador. Cuando exista el rol
+           Moderador como perfil propio, la guarda admite también ese rol. */
+        requiere_rol(1);
+
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $id   = (int)($body['id'] ?? 0);
+        if (!$id) throw new Exception('Falta el id del punto de carga.');
+
+        $stmt = $db->prepare("SELECT nombre FROM puntos_carga WHERE id = :id AND activo = 1");
+        $stmt->execute([':id' => $id]);
+        $pc = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$pc) throw new Exception('El punto de carga no existe o ya estaba oculto.');
+
+        $db->prepare("UPDATE puntos_carga SET activo = 0 WHERE id = :id")->execute([':id' => $id]);
+        echo json_encode(['ok' => true, 'data' => ['nombre' => $pc['nombre']]]);
+        exit;
+    }
 
     if ($method !== 'POST') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']); exit; }
 
@@ -25,7 +52,7 @@ try {
     $departamento = trim($body['departamento'] ?? '') ?: null;
     $descripcion  = trim($body['descripcion'] ?? '') ?: null;
     $horario      = trim($body['horario'] ?? '') ?: null;
-    $costo_kwh    = (float)($body['costo_kwh'] ?? 0);
+    $costo_kwh    = $body['costo_kwh'] ?? 0;
     $lat          = $body['lat'] ?? null;
     $lng          = $body['lng'] ?? null;
     $acceso       = $body['acceso'] ?? 'publico';
@@ -36,6 +63,23 @@ try {
 
     if (!in_array($acceso, ['publico', 'privado'], true))
         throw new Exception('Acceso inválido: debe ser "publico" o "privado".');
+
+    /* El formulario ya acota estos valores, pero eso es sólo comodidad de uso:
+       un cliente puede enviar cualquier cosa. Un precio negativo, por ejemplo,
+       produciría transacciones con monto y comisión negativos. */
+    if (!is_numeric($costo_kwh) || !is_finite((float)$costo_kwh))
+        throw new Exception('El precio por kWh debe ser un número.');
+    $costo_kwh = round((float)$costo_kwh, 2);
+    if ($costo_kwh < 0)
+        throw new Exception('El precio por kWh no puede ser negativo.');
+    /* Cero es válido y significa cargador gratuito. */
+
+    if (!is_numeric($lat) || !is_numeric($lng) || !is_finite((float)$lat) || !is_finite((float)$lng))
+        throw new Exception('Las coordenadas deben ser numéricas.');
+    $lat = (float)$lat;
+    $lng = (float)$lng;
+    if ($lat < -90 || $lat > 90)     throw new Exception('Latitud fuera de rango: debe estar entre -90 y 90.');
+    if ($lng < -180 || $lng > 180)   throw new Exception('Longitud fuera de rango: debe estar entre -180 y 180.');
 
     if (!is_array($conectores) || count($conectores) === 0)
         throw new Exception('Debés agregar al menos un conector.');
@@ -52,9 +96,20 @@ try {
         $tipoNombre = trim($c['tipo'] ?? '');
         if (!isset($tiposMap[$tipoNombre]))
             throw new Exception("Tipo de conector desconocido: \"$tipoNombre\".");
+
+        /* Se exige que sea positiva y que entre en la columna, que es
+           DECIMAL(6,2). No se impone el tope de 350 kW del formulario porque
+           no está definido como regla del proyecto en la documentación. */
+        $potencia = $c['potencia'] ?? null;
+        if (!is_numeric($potencia) || !is_finite((float)$potencia))
+            throw new Exception("La potencia del conector \"$tipoNombre\" debe ser un número.");
+        $potencia = round((float)$potencia, 2);
+        if ($potencia <= 0 || $potencia >= 10000)
+            throw new Exception("Potencia inválida para el conector \"$tipoNombre\".");
+
         $conectoresResueltos[] = [
             'tipo_conector_id' => $tiposMap[$tipoNombre],
-            'potencia_kw'      => (float)($c['potencia'] ?? 0),
+            'potencia_kw'      => $potencia,
         ];
     }
 

@@ -3,7 +3,8 @@
  * E-Find — Estadísticas del dashboard admin
  * GET /api/stats.php  (requiere rol admin)
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';

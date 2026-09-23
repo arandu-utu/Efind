@@ -20,3 +20,6 @@ includes/*
 # Restos de migración, nunca deben ir al repo
 cloudflared-tmp/
 /*.sql
+
+# El manejo de sesión tampoco tiene secretos
+!includes/sesion.php

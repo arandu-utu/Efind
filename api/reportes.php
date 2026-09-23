@@ -5,7 +5,8 @@
  * POST  /api/reportes.php             → crear reporte (usuario autenticado)
  * PATCH /api/reportes.php             → resolver reporte (admin)
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
@@ -59,6 +60,35 @@ try {
 
         if (!$punto_carga_id || !$tipo)
             throw new Exception('Faltan campos requeridos: punto_carga_id y tipo.');
+
+        /* Los tipos válidos son los del ENUM de la columna, que es la fuente de
+           verdad del catálogo. Se leen del esquema en lugar de repetirlos acá,
+           para no tener una tercera copia de la lista además de la base y de
+           js/report-types.js. Sin esta validación, un tipo inválido llegaba al
+           INSERT y el usuario recibía un error SQL crudo. */
+        $stmt = $db->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE()
+                              AND TABLE_NAME = 'reportes' AND COLUMN_NAME = 'tipo'");
+        $definicion = $stmt->fetchColumn() ?: '';
+        preg_match_all("/'([^']+)'/", $definicion, $coincidencias);
+        $tiposValidos = $coincidencias[1] ?? [];
+
+        /* Si el catálogo no se puede leer, se corta acá. Dejar pasar el tipo
+           haría que la validación dependiera del sql_mode del servidor: con
+           STRICT_TRANS_TABLES la base rechaza el valor, pero sin ese modo lo
+           trunca en silencio y queda un reporte con el tipo vacío. */
+        if (!$tiposValidos)
+            throw new Exception('No se pudo leer el catálogo de tipos de reporte.');
+
+        if (!in_array($tipo, $tiposValidos, true))
+            throw new Exception('Tipo de reporte inválido. Opciones: ' . implode(', ', $tiposValidos) . '.');
+
+        /* El panel de administración ya contempla reportes huérfanos, porque un
+           cargador puede desaparecer después. Lo que no debería poder pasar es
+           crear el reporte huérfano de entrada. */
+        $stmt = $db->prepare("SELECT id FROM puntos_carga WHERE id = :id AND activo = 1");
+        $stmt->execute([':id' => $punto_carga_id]);
+        if (!$stmt->fetch()) throw new Exception('El punto de carga no existe o no está disponible.');
 
         $u = usuario_actual();
         $stmt = $db->prepare("

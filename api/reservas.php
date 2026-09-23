@@ -4,7 +4,8 @@
  * GET   /api/reservas.php        → lista las propias (para perfil.html)
  * PATCH /api/reservas.php {id}   → marca una transacción propia como calificada
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';

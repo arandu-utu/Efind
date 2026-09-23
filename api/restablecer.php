@@ -7,7 +7,8 @@
  * El token viaja en claro en el enlace del correo, pero en la base sólo está
  * su SHA-256: se busca por el hash. Es de un solo uso y vence en una hora.
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 
@@ -23,19 +24,6 @@ function token_valido(PDO $db, string $token): ?array {
 try {
     $db     = db_connect();
     $metodo = $_SERVER['REQUEST_METHOD'];
-
-    /* Si la tabla no existe todavía es que nadie pidió nunca un reset:
-       cualquier token es inválido, pero no queremos que reviente el SELECT. */
-    $db->exec("CREATE TABLE IF NOT EXISTS password_resets (
-        id          INT AUTO_INCREMENT PRIMARY KEY,
-        usuario_id  INT NOT NULL,
-        token_hash  CHAR(64) NOT NULL,
-        expira_en   DATETIME NOT NULL,
-        usado_en    DATETIME NULL,
-        creado_en   DATETIME NOT NULL,
-        INDEX idx_token (token_hash),
-        INDEX idx_usuario (usuario_id)
-    )");
 
     if ($metodo === 'GET') {
         $valido = token_valido($db, $_GET['token'] ?? '') !== null;

@@ -6,7 +6,8 @@
  * Tipo de cuenta "empresa"    -> rol_id 3 (propietario), valida RUT + razón social.
  */
 require_once '../includes/db.php';
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido']); exit; }
@@ -78,6 +79,21 @@ if ($stmt->fetch()) {
     exit;
 }
 
+/* Verificar documento duplicado. Lo exige el criterio de aceptación de la
+   historia HU-07: una cédula no puede corresponder a dos cuentas. Se compara
+   sobre el valor ya normalizado, que es el formato en que se almacena.
+   Esta comprobación es la que da el mensaje claro al usuario; la garantía
+   definitiva es el índice UNIQUE sobre ci_rut, porque entre este SELECT y el
+   INSERT dos peticiones simultáneas podrían pasar las dos. */
+$stmt = $pdo->prepare("SELECT id FROM usuarios WHERE ci_rut = ?");
+$stmt->execute([$ciNormalizado]);
+if ($stmt->fetch()) {
+    echo json_encode(['ok' => false, 'error' => $rol === 'empresa'
+        ? 'Ese RUT ya está registrado'
+        : 'Esa cédula ya está registrada']);
+    exit;
+}
+
 $rolId = $rol === 'empresa' ? 3 : 2;
 
 // Crear usuario con bcrypt cost 12
@@ -89,7 +105,8 @@ $stmt = $pdo->prepare(
 $stmt->execute([$nombre, $email, $hash, $ciNormalizado, $empresa, $rolId]);
 $nuevo_id = $pdo->lastInsertId();
 
-// Iniciar sesión automáticamente
+// Iniciar sesión automáticamente, con identificador nuevo
+renovar_sesion();
 $_SESSION['usuario_id'] = $nuevo_id;
 $_SESSION['nombre']     = $nombre;
 $_SESSION['rol_id']     = $rolId;

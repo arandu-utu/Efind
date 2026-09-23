@@ -4,18 +4,14 @@
  * GET  /api/calificaciones.php               → recibidas por el usuario logueado + promedio
  * POST /api/calificaciones.php { para_usuario_id, transaccion_id, puntos, comentario }
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
 try {
     $db = db_connect();
-    $db->exec("CREATE TABLE IF NOT EXISTS calificaciones (
-        id INT AUTO_INCREMENT PRIMARY KEY, de_usuario_id INT NOT NULL, para_usuario_id INT NOT NULL,
-        transaccion_id INT, puntos TINYINT NOT NULL, comentario TEXT,
-        tipo VARCHAR(30) NOT NULL, fecha DATE NOT NULL
-    )");
     requiere_login();
     $u = usuario_actual();
 
@@ -38,15 +34,38 @@ try {
     $tx   = (int)($body['transaccion_id'] ?? 0);
     $pts  = (int)($body['puntos'] ?? 0);
     $com  = trim($body['comentario'] ?? '');
-    if (!$para || $pts < 1 || $pts > 5) throw new Exception('Datos inválidos: falta destinatario o puntuación.');
 
+    if (!$tx)                   throw new Exception('Falta la transacción que se califica.');
+    if ($pts < 1 || $pts > 5)   throw new Exception('La puntuación debe estar entre 1 y 5.');
+
+    /* Una calificación sólo es válida si respalda una carga real del usuario.
+       Sin esta verificación, el cliente podía enviar cualquier destinatario y
+       repetir el envío, porque el endpoint insertaba lo que le mandaran. */
+    $stmt = $db->prepare("SELECT propietario_id, calificado FROM transacciones
+                          WHERE id = :id AND usuario_id = :uid");
+    $stmt->execute([':id' => $tx, ':uid' => $u['id']]);
+    $t = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$t)                                throw new Exception('La transacción no existe o no te pertenece.');
+    if ((int)$t['calificado'] === 1)        throw new Exception('Esa carga ya fue calificada.');
+    if ($t['propietario_id'] === null)      throw new Exception('Esa carga no tiene un propietario a calificar.');
+    if ($para !== (int)$t['propietario_id']) throw new Exception('El destinatario no corresponde a esa transacción.');
+    if ($para === (int)$u['id'])            throw new Exception('No podés calificarte a vos mismo.');
+
+    /* Dos escrituras que deben ir juntas: si se registra la calificación pero
+       la transacción no queda marcada, se podría calificar otra vez. */
+    $db->beginTransaction();
     $db->prepare("INSERT INTO calificaciones (de_usuario_id, para_usuario_id, transaccion_id, puntos, comentario, tipo, fecha)
                   VALUES (:de, :para, :tx, :pts, :com, 'cliente_a_propietario', CURDATE())")
-       ->execute([':de'=>$u['id'], ':para'=>$para, ':tx'=>$tx ?: null, ':pts'=>$pts, ':com'=>$com]);
+       ->execute([':de'=>$u['id'], ':para'=>$para, ':tx'=>$tx, ':pts'=>$pts, ':com'=>$com]);
+    $db->prepare("UPDATE transacciones SET calificado = 1 WHERE id = :id AND usuario_id = :uid")
+       ->execute([':id' => $tx, ':uid' => $u['id']]);
+    $db->commit();
 
     echo json_encode(['ok' => true]);
 
 } catch (Exception $e) {
+    if (isset($db) && $db->inTransaction()) $db->rollBack();
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }

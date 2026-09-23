@@ -110,8 +110,9 @@ efind-frontend/
 │   ├── mock-data.js    # Utilidades de interfaz: Sol de Mayo, calificaciones, URL
 │   └── estimador.js    # Modelo físico de estimación de carga
 ├── db/
-│   ├── schema.sql      # Esquema relacional
-│   └── seed.sql        # Datos iniciales
+│   ├── schema.sql      # Esquema relacional completo, para instalación nueva
+│   ├── seed.sql        # Datos iniciales
+│   └── migraciones/    # Cambios sobre una base que ya existe, con verificación previa
 └── img/                # Logos E-Find y Arandú
 ```
 
@@ -137,7 +138,7 @@ efind-frontend/
 
 Las tablas `reservas` y `pagos` forman parte del esquema original y se conservan, pero el flujo de reserva implementado utiliza `transacciones`, que unifica la reserva y el pago en un único registro con su recibo.
 
-Las cinco últimas tablas del listado se crean con `CREATE TABLE IF NOT EXISTS` la primera vez que se usa el endpoint correspondiente, sin necesidad de una migración manual.
+Las quince tablas están declaradas en `db/schema.sql`. Una base que ya existe se actualiza con los archivos de `db/migraciones/`, que se aplican sobre los datos existentes y llevan al mismo esquema que una instalación nueva. Ningún endpoint crea ni modifica tablas.
 
 ## Identidad visual
 

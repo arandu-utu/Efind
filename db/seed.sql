@@ -4,7 +4,7 @@
 --  Rev. 1.0 — 2026-08-11
 -- =====================================================
 
-USE efind;
+-- La base de destino la indica quien ejecuta el archivo, no el archivo.
 
 -- -----------------------------------------------------
 -- ROLES

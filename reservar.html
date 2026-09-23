@@ -45,6 +45,7 @@
       <select id="sel-vehiculo" class="form-select" onchange="recalcular()">
         <option value="">— Seleccioná un vehículo —</option>
       </select>
+      <div id="alert-sin-vehiculo" role="status" aria-live="polite" style="display:none;margin-top:.5rem"></div>
     </div>
 
     <!-- Conector -->
@@ -158,11 +159,18 @@
   async function enviarCalificacion() {
     if (!pickerCalificacion?.valor) { showAlert('alert-rating', 'Seleccioná una puntuación antes de enviar.', 'warn', 4000); return; }
     if (!window._txPropietarioId) return;
-    await apiFetch('/api/calificaciones.php', 'POST', {
+
+    /* La respuesta se comprueba: el endpoint valida que la transacción sea
+       propia y que no esté calificada, así que puede rechazar el envío. */
+    const res = await apiFetch('/api/calificaciones.php', 'POST', {
       para_usuario_id: window._txPropietarioId, transaccion_id: window._txId,
       puntos: pickerCalificacion.valor, comentario: document.getElementById('rating-comentario').value.trim(),
-    }).catch(()=>{});
-    apiFetch('/api/reservas.php', 'PATCH', { id: window._txId }).catch(()=>{});
+    }).catch(() => ({ ok: false, error: 'Error de conexión con el servidor.' }));
+
+    if (!res.ok) {
+      showAlert('alert-rating', res.error || 'No se pudo registrar la calificación.', 'error', 5000);
+      return;
+    }
     document.getElementById('rating-section').innerHTML =
       '<p style="color:var(--green);font-weight:600;text-align:center;padding:.75rem">✓ ¡Gracias por tu calificación!</p>';
   }
@@ -182,7 +190,7 @@ let C = null, calcActual = null;
       id: r.data.id, nombre: r.data.nombre, direccion: r.data.direccion || 'Sin dirección registrada',
       horario: r.data.horario || 'No especificado', costo_kwh: +r.data.costo_kwh || 0,
       propietario_id: r.data.propietario_id, fuente: r.data.fuente,
-      conectores: (r.data.conectores || []).map(c => ({ tipo: c.tipo, potencia: parseFloat(c.potencia_kw) })),
+      conectores: (r.data.conectores || []).map(c => ({ id: c.id, tipo: c.tipo, potencia: parseFloat(c.potencia_kw) })),
     };
     await init();
   } catch { location.href = 'index.html'; }
@@ -200,10 +208,21 @@ async function init() {
   const vehs = await apiFetch('/api/vehiculos.php').then(j => j.ok ? j.data : []).catch(() => []);
   vehs.forEach(v => {
     const o = document.createElement('option');
-    o.value = v.capacidad_kwh;
+    /* El valor es el id: la capacidad la resuelve el servidor desde la base.
+       Acá queda en un data-* sólo para la estimación que se muestra en vivo. */
+    o.value = v.id;
+    o.dataset.cap = v.capacidad_kwh;
     o.textContent = `${v.marca} ${v.modelo} (${v.capacidad_kwh} kWh)`;
     sel.appendChild(o);
   });
+
+  if (!vehs.length) {
+    sel.innerHTML = '<option value="">No tenés vehículos registrados</option>';
+    sel.disabled = true;
+    showAlert('alert-sin-vehiculo',
+      'Para reservar una carga necesitás registrar un vehículo. Podés hacerlo en <a href="perfil.html">tu perfil</a>.',
+      'info');
+  }
 
   /* Conectores */
   const selC = document.getElementById('sel-conector');
@@ -220,17 +239,31 @@ async function init() {
 
 function recalcular() {
   const selV = document.getElementById('sel-vehiculo');
-  const cap  = selV.value ? +selV.value : 60;
+  const opt  = selV.selectedOptions[0];
+  const cap  = opt && opt.dataset.cap ? +opt.dataset.cap : 0;
   const soc  = +document.getElementById('soc').value;
-  const pot  = C.conectores[+document.getElementById('sel-conector').value]?.potencia || 7.4;
-  const r    = calcularCarga(cap, soc, pot);
+  const con  = C.conectores[+document.getElementById('sel-conector').value];
+  const pot  = con?.potencia || 7.4;
+
+  /* Sin vehículo elegido no hay nada que estimar: antes se usaba una batería
+     de 60 kWh por defecto, que no correspondía a ningún vehículo real. */
+  if (!cap) {
+    ['c-kwh','c-tiempo','c-subtotal','c-comision','c-total'].forEach(id =>
+      document.getElementById(id).textContent = '—');
+    document.getElementById('c-precio').textContent = C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito';
+    calcActual = null;
+    return;
+  }
+
+  const r = calcularCarga(cap, soc, pot);
   const kwh  = r.kwh;
   const costo = C.costo_kwh || 0;
   const subtotal = kwh * costo;
   const comision = subtotal * 0.10;
   const total    = subtotal;
 
-  calcActual = { cap, soc, pot, kwh, tiempo: r.texto, subtotal, comision, total };
+  calcActual = { cap, soc, pot, kwh, tiempo: r.texto, subtotal, comision, total,
+                 vehiculoId: +selV.value, conectorId: con?.id };
 
   document.getElementById('c-kwh').textContent     = kwh + ' kWh';
   document.getElementById('c-tiempo').textContent  = r.texto;
@@ -241,6 +274,10 @@ function recalcular() {
 }
 
 function irPago() {
+  if (!calcActual || !calcActual.vehiculoId) {
+    showAlert('alert-sin-vehiculo', 'Elegí el vehículo que vas a cargar antes de continuar.', 'warn', 5000);
+    return;
+  }
   document.getElementById('panel-reserva').style.display = 'none';
   document.getElementById('panel-pago').style.display    = '';
   if (!C.costo_kwh) pagar(); /* Gratuito: saltar directo al pago (queda en $0) */
@@ -279,8 +316,11 @@ function procesarPago() {
 }
 
 async function pagar() {
+  /* Sólo identificadores y el estado de carga: el importe lo reconstruye
+     el servidor desde el vehículo, el conector y el precio del cargador. */
   const res = await apiFetch('/api/pagos.php', 'POST',
-    { punto_carga_id: C.id, capacidad_kwh: calcActual.cap, soc_pct: calcActual.soc, potencia_kw: calcActual.pot }
+    { punto_carga_id: C.id, vehiculo_id: calcActual.vehiculoId,
+      conector_id: calcActual.conectorId, soc_pct: calcActual.soc }
   ).catch(() => ({ ok:false }));
 
   if (!res.ok) {

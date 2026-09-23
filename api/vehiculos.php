@@ -10,7 +10,8 @@
  * no las que este archivo asumía originalmente. El JSON que expone sigue
  * llamándose capacidad_kwh/tipo_conector para no tocar el frontend.
  */
-session_start();
+require_once '../includes/sesion.php';
+iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
