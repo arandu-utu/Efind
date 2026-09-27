@@ -76,3 +76,64 @@ calificación sin transacción asociada):
 - `login_intentos` sigue aceptando intentos contra correos que no son de ningún
   usuario, que es justamente su función.
 - Los 65 casos de integración dan 65/65 antes y después de migrar.
+
+---
+
+## 002 — Estado de las estaciones de UTE
+
+La API de UTE devuelve `statusDetail = 'Busy'` en todos sus conectores, en todas
+las corridas. Es un valor constante que no informa ocupación real, y al mapearlo
+como `ocupado` el mapa quedaba con casi todas las estaciones en naranja.
+
+A partir de ahora una estación de UTE queda `disponible` salvo que la comunidad
+reporte otra cosa, y el sincronizador ya no pisa ese reporte. Esta migración
+corrige las filas que quedaron congeladas por las corridas anteriores.
+
+```bash
+mysql -u root -p efind < db/migraciones/002_estado_ute.sql
+```
+
+**Se ejecuta una sola vez.** Después de aplicarla, un `ocupado` en una estación
+de UTE ya no viene del sincronizador sino de un reporte real de la comunidad, y
+volver a correrla lo borraría.
+
+Probada sobre una réplica de producción: 212 estaciones liberadas, los
+cargadores de E-Find sin tocar, y un reporte de la comunidad sobrevive a dos
+sincronizaciones seguidas contra el feed real.
+
+## 003 — El número de recibo no puede repetirse
+
+El recibo identifica la operación ante el usuario. Se armaba con la hora más un
+número al azar de tres cifras, o sea 900 valores por segundo, y la columna no
+tenía índice único: dos pagos en el mismo segundo podían quedar con el mismo
+comprobante sin que nada avisara.
+
+```bash
+mysql -u root -p efind < db/migraciones/003_recibo_unico.sql
+```
+
+Idempotente. Si hubiera recibos repetidos de antes, el `ALTER` falla y no
+escribe nada: en ese caso hay que revisarlos, no forzar el índice.
+
+## 004 — Retirar del mapa los cargadores de prueba
+
+Durante el desarrollo quedaron publicados cargadores creados para probar el
+alta, tres de ellos con un par de coordenadas en el campo de dirección. No se
+borran: se retiran con `activo = 0`, igual que hace la HU-05, porque
+`transacciones` y `resenas` los referencian con `ON DELETE RESTRICT` y una carga
+realizada es un registro contable.
+
+```bash
+mysql -u root -p efind < db/migraciones/004_higiene_datos_prueba.sql
+```
+
+**Los identificadores son los de producción al 27/09/2026 y no valen para otra
+instalación.** Revisar la lista que imprime antes de confirmar.
+
+## Orden de aplicación
+
+Sobre una base existente: 001, 002, 003, 004. Las tres primeras van **antes** de
+desplegar el código que las acompaña; la 004 puede ir después.
+
+Una instalación nueva desde `db/schema.sql` ya incluye todo lo estructural de
+001 y 003, así que sólo necesita el esquema y la semilla.

@@ -55,7 +55,9 @@
         <input type="text" id="inp-lng" class="form-input" readonly placeholder="-56.1882">
       </div>
     </div>
-    <input type="text" id="dir-final" class="form-input" placeholder="Dirección completa (editable)" style="margin-top:.75rem">
+    <label class="form-label" for="dir-final" style="margin-top:.75rem;display:block">Dirección completa *</label>
+    <input type="text" id="dir-final" class="form-input" placeholder="Ej.: Av. Italia 2345, Montevideo" required>
+    <div class="form-error" id="err-direccion">Escribí la dirección del cargador.</div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button class="btn btn--primary" onclick="irPaso(1)" id="btn-p1">Siguiente →</button>
     </div>
@@ -162,8 +164,9 @@ mapa.on('click', e => {
   lngSel = e.latlng.lng.toFixed(6);
   document.getElementById('inp-lat').value = latSel;
   document.getElementById('inp-lng').value = lngSel;
-  if (!document.getElementById('dir-final').value)
-    document.getElementById('dir-final').value = `${latSel}, ${lngSel}`;
+  /* No se rellena la dirección con las coordenadas: un par de números no es
+     una dirección, y así quedaron publicados cargadores con "-34.90, -56.16"
+     en ese campo. Las coordenadas ya se guardan aparte, en lat y lng. */
 });
 
 function buscarDir() {
@@ -216,6 +219,11 @@ function irPaso(n) {
   /* Validaciones */
   if (n > 0 && pasoActual === 0 && (!latSel || !lngSel)) {
     showAlert('alert-ubicacion', 'Hacé clic en el mapa para seleccionar la ubicación.', 'warn', 5000); return;
+  }
+  if (n > 0 && pasoActual === 0) {
+    const dir = document.getElementById('dir-final').value.trim();
+    if (!dir) { document.getElementById('err-direccion').classList.add('show'); return; }
+    document.getElementById('err-direccion').classList.remove('show');
   }
   if (n > 1 && pasoActual === 1) {
     const nom = document.getElementById('nombre-c').value.trim();
