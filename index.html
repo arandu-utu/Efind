@@ -8,8 +8,8 @@
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
   <title>E-Find — Mapa de Cargadores</title>
-  <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/style.css">
   <meta name="description" content="Encuentra puntos de carga para vehículos eléctricos en Uruguay. Mapa en tiempo real, filtros y reservas.">
   <meta property="og:title"       content="E-Find — Mapa de Cargadores">
   <meta property="og:description" content="Encuentra puntos de carga para vehículos eléctricos en Uruguay. Mapa en tiempo real, filtros y reservas.">
@@ -117,6 +117,39 @@
 /* ══════════════════════════════════════════════════════════════
    MAPA PRINCIPAL
 ══════════════════════════════════════════════════════════════ */
+
+/* Plegado de filtros en móvil. El botón se crea desde acá porque sólo esta
+   página tiene barra lateral de filtros; en escritorio el CSS lo oculta y la
+   barra se ve entera, igual que siempre. */
+(function filtrosPlegables() {
+  const barra = document.querySelector('.map-sidebar');
+  const cabecera = document.querySelector('.map-sidebar__head');
+  if (!barra || !cabecera) return;
+
+  const boton = document.createElement('button');
+  boton.type = 'button';
+  boton.className = 'filtros-toggle';
+  boton.setAttribute('aria-controls', 'filtros-cuerpo');
+  boton.innerHTML = '<span data-i18n="filtros">Filtros</span><span class="filtros-toggle__flecha">▼</span>';
+  cabecera.appendChild(boton);
+
+  const cuerpo = document.querySelector('.map-sidebar__body');
+  if (cuerpo) cuerpo.id = 'filtros-cuerpo';
+
+  const marcarEstado = () =>
+    boton.setAttribute('aria-expanded', barra.classList.contains('filtros-abiertos') ? 'true' : 'false');
+
+  boton.addEventListener('click', () => {
+    barra.classList.toggle('filtros-abiertos');
+    marcarEstado();
+    /* Leaflet fija su tamaño al crearse: si cambia el alto disponible hay que
+       avisarle, o el mapa queda dibujado sobre una caja que ya no existe. */
+    setTimeout(() => map.invalidateSize(), 210);
+  });
+
+  marcarEstado();
+  if (window.I18N) I18N.apply(false);
+})();
 
 // Inicializar mapa centrado en Montevideo
 const map = L.map('mapa').setView([-34.9058, -56.1652], 13);

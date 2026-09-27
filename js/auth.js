@@ -202,6 +202,7 @@ function renderNavbar() {
           <a href="registro.html" class="btn btn--primary btn--sm">${t('nav_registro')}</a>
         `}
         ${langToggle}
+        <span class="navbar__salto" aria-hidden="true"></span>
       </div>
     </div>
   `;

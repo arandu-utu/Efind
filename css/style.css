@@ -238,16 +238,51 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 
 .admin-sidebar { width: 54px; }
 .sidebar-link span, .sidebar-section { display: none; }
 }
+/* Plegado de filtros del mapa. El botón sólo existe en móvil: en escritorio
+   la barra lateral se ve entera y no hace falta. */
+.filtros-toggle { display: none; width: 100%; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .6rem; min-height: 40px; padding: .45rem .7rem; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: .85rem; font-weight: 600; cursor: pointer; }
+.filtros-toggle__flecha { display: inline-block; transition: transform var(--t); font-size: .7rem; color: var(--soft); }
+.navbar__salto { display: none; }
+.map-sidebar.filtros-abiertos .filtros-toggle__flecha { transform: rotate(180deg); }
+
 @media (max-width: 700px) {
-.map-layout { flex-direction: column; }
-.map-sidebar { width: 100%; height: 280px; border-right: none; border-bottom: 1px solid var(--border); }
-.map-container { min-height: 350px; }
+/* Navbar. El logo desaparecía porque, sin flex-shrink, se comprimía a cero, y
+   la fila se desbordaba porque no podía envolver. display:contents sube los
+   enlaces al flex del contenedor: así el idioma queda junto al logo y las
+   acciones bajan a una segunda fila, sin tocar el HTML ni el escritorio. */
+.navbar { height: auto; }
+.navbar__inner { flex-wrap: wrap; height: auto; justify-content: flex-start; gap: .35rem; padding: .45rem .9rem .55rem; }
+.navbar__links { display: contents; }
+.nav-logo { flex-shrink: 0; order: 0; }
+.lang-toggle { order: 1; margin-left: auto; }
+/* Fila 1: logo e idioma. El separador ocupa el ancho completo y obliga a que
+   las acciones bajen enteras a la fila 2, en vez de repartirse a los saltos. */
+.navbar__salto { display: block; order: 2; flex: 0 0 100%; height: 0; }
+.navbar__links > .nav-link, .navbar__links > .btn, .navbar__user { order: 3; }
+/* Tamaño cómodo para el pulgar en los controles que se tocan de verdad. */
+.nav-link { display: inline-flex; align-items: center; min-height: 40px; padding: .4rem .6rem; font-size: .88rem; }
+.navbar__links > .btn--sm { min-height: 40px; padding: .4rem .85rem; font-size: .85rem; }
+.lang-btn { min-height: 40px; min-width: 42px; font-size: .78rem; }
+.user-chip { min-height: 40px; }
+/* Leaflet trae .leaflet-touch .leaflet-bar a con dos clases: hay que igualar esa
+   especificidad para poder agrandar el zoom en pantallas táctiles. */
+.leaflet-touch .leaflet-control-zoom a, .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 38px; font-size: 1.3rem; }
+/* El mapa es lo que se viene a ver: los filtros se pliegan en lugar de
+   reservar 280 px fijos antes de mostrar nada. */
+.map-layout { flex-direction: column; height: auto; }
+.map-sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+.map-sidebar__body { display: none; }
+.map-sidebar.filtros-abiertos .map-sidebar__body { display: block; max-height: 45vh; overflow-y: auto; }
+.filtros-toggle { display: flex; }
+.map-container { flex: none; height: 65vh; min-height: 320px; }
+/* Login y registro dejaban un hueco muerto bajo el formulario, heredado de la
+   altura de la composición de dos columnas del escritorio. */
+.auth-wrap { min-height: 0; }
+.auth-panel { width: 100%; padding: 1.5rem 1.15rem; justify-content: flex-start; }
 .kpi-grid { grid-template-columns: 1fr 1fr; }
 .container { padding: 1.25rem 1rem; }
 }
 @media (max-width: 480px) {
-.navbar__inner { padding: 0 .9rem; }
-.nav-link { padding: .3rem .45rem; font-size: .82rem; }
 .kpi-grid { grid-template-columns: 1fr; }
 }
 
