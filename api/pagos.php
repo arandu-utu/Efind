@@ -81,7 +81,10 @@ try {
 
     $subtotal = round($kwh * (float)$p['costo_kwh'], 2);
     $comision = round($subtotal * COMISION, 2);
-    $recibo   = 'EF-' . time() . rand(100, 999);
+    /* random_bytes en vez de rand(): el recibo identifica la operación ante el
+       usuario y no debe poder repetirse ni adivinarse. El índice único de la
+       migración 003 cierra la carrera que esto solo no cierra. */
+    $recibo   = 'EF-' . time() . strtoupper(bin2hex(random_bytes(3)));
 
     $stmt = $db->prepare("INSERT INTO transacciones
         (usuario_id, punto_carga_id, propietario_id, recibo, kwh, tiempo, monto_total, comision, fecha)

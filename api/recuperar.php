@@ -51,9 +51,11 @@ try {
     $stmt = $db->prepare("SELECT COUNT(*) FROM password_resets
                           WHERE usuario_id = :uid AND creado_en > (NOW() - INTERVAL 1 HOUR)");
     $stmt->execute([':uid' => $usuario['id']]);
+    /* Se corta igual, pero con la misma respuesta que una cuenta inexistente:
+       contestar distinto acá servía para averiguar qué direcciones están
+       registradas, que es justo lo que el resto del endpoint evita. */
     if ((int)$stmt->fetchColumn() >= RESET_MAX_POR_HORA) {
-        http_response_code(429);
-        echo json_encode(['ok' => false, 'error' => 'Ya pediste varios enlaces en la última hora. Esperá un rato antes de volver a intentar.']);
+        echo json_encode($RESPUESTA_GENERICA);
         exit;
     }
 

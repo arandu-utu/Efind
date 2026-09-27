@@ -205,6 +205,7 @@ CREATE TABLE transacciones (
   comision       DECIMAL(10,2) NOT NULL DEFAULT 0,
   calificado     TINYINT(1)    NOT NULL DEFAULT 0,
   fecha          DATE          NOT NULL,
+  UNIQUE KEY uq_recibo (recibo),
   CONSTRAINT fk_transacciones_usuario     FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE RESTRICT,
   CONSTRAINT fk_transacciones_punto_carga FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE RESTRICT,
   CONSTRAINT fk_transacciones_propietario FOREIGN KEY (propietario_id) REFERENCES usuarios(id)     ON DELETE SET NULL

@@ -243,8 +243,9 @@ function renderLista(lista) {
   if (!ordenada.length) {
     el.innerHTML = `<div class="empty-state" style="padding:2rem 1rem">
       <div class="empty-state__icon">${ICONS.bolt(40)}</div>
-      <div class="empty-state__title">${I18N.t('sin_cargadores')}</div>
-      <div class="empty-state__body">${I18N.t('sin_cargadores_body')}</div>
+      <div class="empty-state__title">${fallaDeCarga ? I18N.t('sin_conexion') : I18N.t('sin_cargadores')}</div>
+      <div class="empty-state__body">${fallaDeCarga ? I18N.t('sin_conexion_body') : I18N.t('sin_cargadores_body')}</div>
+      ${fallaDeCarga ? `<button type="button" class="btn btn--primary btn--sm" style="margin-top:.8rem" onclick="cargarEstaciones()">${I18N.t('reintentar')}</button>` : ''}
     </div>`;
     return;
   }
@@ -372,18 +373,25 @@ leyenda.onAdd = () => {
 leyenda.addTo(map);
 
 // ── Carga inicial de datos (E-Find + UTE sincronizadas, una sola API) ──
+let fallaDeCarga = false;
+
 async function cargarEstaciones() {
   mostrarCargando('charger-list', 'Cargando cargadores…');
+  /* Una lista vacía porque no hay resultados y una lista vacía porque el
+     servidor no contestó se ven igual, y para el usuario son dos cosas
+     distintas: en la segunda puede reintentar. */
+  fallaDeCarga = false;
   try {
     const json = await apiFetch('/api/estaciones.php');
     if (json.ok) {
       todasEstaciones = json.data;
-      console.info(`EfindAPI: ${todasEstaciones.length} estaciones cargadas.`);
     } else {
-      console.warn('EfindAPI: error al cargar estaciones.', json.error);
+      fallaDeCarga = true;
+      console.warn('No se pudieron cargar las estaciones.', json.error);
     }
   } catch (err) {
-    console.warn('EfindAPI: no se pudo conectar con el servidor.', err.message);
+    fallaDeCarga = true;
+    console.warn('No se pudo conectar con el servidor.', err.message);
   }
   aplicarFiltros();
 }

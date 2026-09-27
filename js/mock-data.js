@@ -61,7 +61,7 @@ function solesHTML(n, px = 15) {
  * @param {number}      total     — cantidad de calificaciones
  */
 function renderStars(promedio, total) {
-  if (promedio === null || total === 0) return `<span class="user-rating user-rating--new">Nuevo</span>`;
+  if (promedio === null || total === 0) return `<span class="user-rating user-rating--new" data-i18n="calificacion_nuevo">Nuevo</span>`;
   return `<span class="user-soles" title="${promedio.toFixed(1)} / 5 (${total} calificaciones)"
                style="display:inline-flex;align-items:center;gap:1px;vertical-align:middle">${solesHTML(Math.round(promedio))}</span
          ><span class="user-rating-count">${promedio.toFixed(1)}</span>`;

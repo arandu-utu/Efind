@@ -9,7 +9,7 @@ require_once '../includes/db.php';
 
 try {
     $db    = db_connect();
-    $limit = isset($_GET['limit']) ? min((int)$_GET['limit'], 1000) : 500;
+    $limit = isset($_GET['limit']) ? min(max((int)$_GET['limit'], 1), 1000) : 500;
 
     /* LIMIT se aplica sobre estaciones distintas (subquery), no sobre las
        filas planas estación×conector del join de abajo — si se aplicara

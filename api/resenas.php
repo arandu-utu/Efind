@@ -105,7 +105,7 @@ try {
         $id     = (int)($body['id'] ?? 0);
         $estado = $body['estado'] ?? '';
 
-        if (!$id || !in_array($estado, ['aprobada', 'rechazada']))
+        if (!$id || !in_array($estado, ['aprobada', 'rechazada'], true))
             throw new Exception('Datos inválidos: id y estado requeridos.');
 
         $stmt = $db->prepare("UPDATE resenas SET estado = :estado WHERE id = :id");

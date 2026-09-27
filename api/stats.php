@@ -37,20 +37,16 @@ try {
 
     /* Cargadores registrados por mes en el año actual */
     $porMes = array_fill(0, 12, 0);
-    try {
-        $year = (int)date('Y');
-        $stmt = $db->prepare(
-            "SELECT MONTH(fecha_creacion) m, COUNT(*) c
-             FROM puntos_carga
-             WHERE YEAR(fecha_creacion) = :y
-             GROUP BY m"
-        );
-        $stmt->execute([':y' => $year]);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $porMes[(int)$r['m'] - 1] = (int)$r['c'];
-        }
-    } catch (Throwable $e) {
-        /* La columna fecha_creacion no existe: dejamos ceros */
+    $year = (int)date('Y');
+    $stmt = $db->prepare(
+        "SELECT MONTH(creado_en) m, COUNT(*) c
+         FROM puntos_carga
+         WHERE YEAR(creado_en) = :y
+         GROUP BY m"
+    );
+    $stmt->execute([':y' => $year]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $porMes[(int)$r['m'] - 1] = (int)$r['c'];
     }
 
     echo json_encode(['ok' => true, 'data' => [

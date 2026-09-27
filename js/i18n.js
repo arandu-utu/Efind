@@ -13,6 +13,7 @@ window.I18N = {
       nav_mapa: 'Mapa',
       nav_admin: 'Panel Admin',
       nav_agregar: '+ Agregar',
+      calificacion_nuevo: 'Nuevo',
       nav_perfil: 'Mi perfil',
       nav_administracion: 'Administración',
       nav_logout: 'Cerrar sesión',
@@ -23,6 +24,9 @@ window.I18N = {
       footer_dev: 'Desarrollado por',
       buscar_placeholder: 'Buscar cargador o dirección…',
       filtros: 'Filtros',
+      sin_conexion: 'No se pudo conectar con el servidor',
+      sin_conexion_body: 'Revisá tu conexión y volvé a intentar.',
+      reintentar: 'Reintentar',
       tipo_conector: 'Tipo de conector',
       potencia_minima: 'Potencia mínima',
       potencia_cualquiera: 'Cualquiera',
@@ -77,6 +81,7 @@ window.I18N = {
       nav_mapa: 'Map',
       nav_admin: 'Admin Panel',
       nav_agregar: '+ Add',
+      calificacion_nuevo: 'New',
       nav_perfil: 'My profile',
       nav_administracion: 'Administration',
       nav_logout: 'Log out',
@@ -87,6 +92,9 @@ window.I18N = {
       footer_dev: 'Developed by',
       buscar_placeholder: 'Search charger or address…',
       filtros: 'Filters',
+      sin_conexion: 'Could not reach the server',
+      sin_conexion_body: 'Check your connection and try again.',
+      reintentar: 'Retry',
       tipo_conector: 'Connector type',
       potencia_minima: 'Minimum power',
       potencia_cualquiera: 'Any',
@@ -508,7 +516,10 @@ window.I18N = {
     while ((n = tw.nextNode())) {
       if (n.__i18nOrig === undefined) n.__i18nOrig = n.nodeValue;
       const trimmed = n.__i18nOrig.trim();
-      if (trimmed) n.nodeValue = n.__i18nOrig.replace(trimmed, this.autoT(trimmed));
+      /* El reemplazo va como función: si se pasa como cadena, replace() expande
+           $&, $` y $$ y corrompe cualquier texto que los contenga (un precio en
+           pesos, por ejemplo). */
+        if (trimmed) n.nodeValue = n.__i18nOrig.replace(trimmed, () => this.autoT(trimmed));
     }
     document.querySelectorAll('input[placeholder]:not([data-i18n-placeholder]), textarea[placeholder]:not([data-i18n-placeholder])').forEach(el => {
       if (el.__i18nPh === undefined) el.__i18nPh = el.placeholder;

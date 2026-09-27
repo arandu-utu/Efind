@@ -80,7 +80,7 @@ try {
 
         if (array_key_exists('rol_id', $body)) {
             $rol_id = (int)$body['rol_id'];
-            if (!in_array($rol_id, [1, 2, 3]))
+            if (!in_array($rol_id, [1, 2, 3], true))
                 throw new Exception('rol_id inválido.');
             $stmt = $db->prepare("UPDATE usuarios SET rol_id = :r WHERE id = :id");
             $stmt->execute([':r' => $rol_id, ':id' => $id]);

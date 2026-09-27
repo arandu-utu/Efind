@@ -8,14 +8,24 @@ const Auth = {
 
   /* Usuario actual (objeto) o null */
   get() {
-    const raw = localStorage.getItem(this.KEY);
-    return raw ? JSON.parse(raw) : null;
+    /* Si el valor guardado quedó a medio escribir, JSON.parse lanza y la
+       excepción sube hasta renderNavbar: la página queda sin barra, sin pie y
+       sin contenido. Se descarta y se sigue como visitante. */
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      localStorage.removeItem(this.KEY);
+      return null;
+    }
   },
 
   logout() {
     localStorage.removeItem(this.KEY);
     // Destruir sesión PHP en el servidor (fire & forget)
-    fetch('/api/logout.php').catch(() => {});
+    /* keepalive: sin él, la navegación que suele venir justo después cancela
+       la petición y la sesión del servidor sobrevive al cierre de sesión. */
+    fetch('/api/logout.php', { keepalive: true }).catch(() => {});
   },
 
   is(role) {
@@ -29,19 +39,34 @@ const Auth = {
   },
 
   isAny(...roles) {
-    const u = this.get();
-    return u ? roles.some(r => this.is(r)) : false;
+    return this.get() ? roles.some(r => this.is(r)) : false;
   },
 };
 
 /* ── Fetch a /api/*.php con body JSON, devuelve la respuesta ya parseada ── */
-function apiFetch(url, method = 'GET', body) {
+async function apiFetch(url, method = 'GET', body) {
   const opts = { method };
   if (body !== undefined) {
     opts.headers = { 'Content-Type': 'application/json' };
     opts.body = JSON.stringify(body);
   }
-  return fetch(url, opts).then(r => r.json());
+  const res = await fetch(url, opts);
+
+  /* La sesión dura menos que la pestaña abierta. Sin esto, al vencer, el navbar
+     sigue mostrando al usuario y cada acción falla con un error genérico en vez
+     de mandar a iniciar sesión otra vez. */
+  if (res.status === 401 && !location.pathname.endsWith('login.html')) {
+    Auth.logout();
+    location.href = 'login.html';
+    return { ok: false, error: 'Tu sesión venció.' };
+  }
+
+  /* Un error del servidor puede devolver HTML en lugar de JSON. */
+  try {
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'El servidor devolvió una respuesta inesperada.' };
+  }
 }
 
 /* ── Muestra un <div class="alert"> ya existente en la página ────────
