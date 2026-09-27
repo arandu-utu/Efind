@@ -35,7 +35,7 @@ INSERT INTO tipos_conector (nombre, carga_rapida) VALUES
 INSERT INTO usuarios (nombre, email, password_hash, rol_id) VALUES
   ('Administrador E-Find',
    'admin@efind.uy',
-   '$2y$12$placeholder_hash_cambiar_en_produccion_xxxxxxxxxxxxxxxxxxx',
+   '$2y$12$iTxeBt8rUDl9pXhhM4LYy.Mv4ERyjhfKYsKMCAvYvcQZn.tC92mA.',
    1);
 
 

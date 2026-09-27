@@ -27,11 +27,17 @@ const TIPO_MAP = [
     'GB/T'   => 'GB/T DC',
 ];
 
+/* UTE devuelve statusDetail = 'Busy' en todos sus conectores, en todas las
+   corridas: es un valor constante que no informa ocupación real. Tratarlo como
+   'ocupado' dejaba el mapa entero en naranja y presentaba como estado algo que
+   la fuente no publica. Se lo toma como "sin dato" y la estación queda
+   disponible, que es el supuesto por defecto. El resto de los valores sigue
+   mapeado por si la fuente alguna vez publica estados reales. */
 const STATUS_MAP = [
     'Disponible'    => 'disponible',
     'Available'     => 'disponible',
+    'Busy'          => 'disponible',
     'Cargando'      => 'ocupado',
-    'Busy'          => 'ocupado',
     'Occupied'      => 'ocupado',
     'FueraServicio' => 'sin_servicio',
     'OutOfService'  => 'sin_servicio',
@@ -39,8 +45,10 @@ const STATUS_MAP = [
     'Offline'       => 'sin_servicio',
 ];
 
+/* Un valor que no conocemos tampoco es motivo para declarar la estación fuera
+   de servicio: ante la duda queda disponible y la comunidad corrige. */
 function normalizarEstado($s) {
-    return STATUS_MAP[$s] ?? 'sin_servicio';
+    return STATUS_MAP[$s] ?? 'disponible';
 }
 
 function calcularEstadoEstacion($conectores) {
@@ -87,7 +95,7 @@ try {
     $stmtUpdate = $db->prepare("
         UPDATE puntos_carga
         SET direccion = :direccion, ciudad = :ciudad, departamento = :departamento,
-            lat = :lat, lng = :lng, estado = :estado, horario = '24 horas', costo_kwh = 0
+            lat = :lat, lng = :lng, horario = '24 horas', costo_kwh = 0
         WHERE id = :id
     ");
     $stmtBorrarConectores = $db->prepare("DELETE FROM conectores WHERE punto_carga_id = :id");
@@ -128,7 +136,6 @@ try {
                 ':departamento' => $raw['department'] ?? null,
                 ':lat'          => $raw['lat'],
                 ':lng'          => $raw['lng'],
-                ':estado'       => $estado,
                 ':id'           => $puntoCargaId,
             ]);
             $stmtBorrarConectores->execute([':id' => $puntoCargaId]);
@@ -173,7 +180,7 @@ try {
         'total_ute'    => count($json['data']),
     ]]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

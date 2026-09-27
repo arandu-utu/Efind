@@ -104,7 +104,7 @@ try {
 
     try {
         smtp_enviar($email, 'Restablecer tu contraseña de E-Find', $html);
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         /* No se lo contamos al cliente para no filtrar si la cuenta existe,
            pero queda en el log de Apache para poder diagnosticarlo. */
         error_log('E-Find recuperar.php — fallo al enviar correo: ' . $e->getMessage());
@@ -112,7 +112,7 @@ try {
 
     echo json_encode($RESPUESTA_GENERICA);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }

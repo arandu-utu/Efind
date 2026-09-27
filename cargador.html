@@ -251,7 +251,7 @@ function renderPage() {
             ${C.resenas.map(r => `
               <div class="resena-item">
                 <div style="display:flex;justify-content:space-between;align-items:center">
-                  <strong style="font-size:.9rem">${r.usuario}</strong>
+                  <strong style="font-size:.9rem">${escapeHtml(r.usuario)}</strong>
                   <span style="font-size:.78rem;color:var(--soft)">${r.fecha}</span>
                 </div>
                 <div class="stars-display" style="margin:.3rem 0">${stars(r.estrellas)}</div>

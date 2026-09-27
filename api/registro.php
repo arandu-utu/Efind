@@ -29,13 +29,20 @@ function validar_rut($rut) {
     return (bool)preg_match('/^\d{12}$/', normalizar_documento($rut));
 }
 
-$body    = json_decode(file_get_contents('php://input'), true);
-$nombre  = trim($body['nombre']   ?? '');
-$email   = trim($body['email']    ?? '');
-$password = $body['password']     ?? '';
-$rol     = ($body['rol'] ?? 'particular') === 'empresa' ? 'empresa' : 'particular';
-$ci      = trim($body['ci']       ?? '');
-$empresa = trim($body['empresa']  ?? '');
+/* El cuerpo es JSON del cliente: cualquier campo puede llegar como array o
+   como número. trim() sobre un array lanza TypeError, que no es Exception y
+   tumbaría el script después de haber mandado ya la cabecera JSON. */
+function campo_texto($valor): string {
+    return is_string($valor) ? trim($valor) : '';
+}
+
+$body     = json_decode(file_get_contents('php://input'), true) ?? [];
+$nombre   = campo_texto($body['nombre']  ?? null);
+$email    = campo_texto($body['email']   ?? null);
+$password = is_string($body['password'] ?? null) ? $body['password'] : '';
+$rol      = ($body['rol'] ?? 'particular') === 'empresa' ? 'empresa' : 'particular';
+$ci       = campo_texto($body['ci']      ?? null);
+$empresa  = campo_texto($body['empresa'] ?? null);
 
 if (!$nombre || !$email || !$password || !$ci) {
     http_response_code(400);

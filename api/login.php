@@ -6,9 +6,16 @@ header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido']); exit; }
 
-$data = json_decode(file_get_contents('php://input'), true);
-$email = trim($data['email'] ?? '');
-$pass  = $data['password'] ?? '';
+/* El cuerpo es JSON del cliente: cualquier campo puede llegar como array o
+   como número. trim() sobre un array lanza TypeError, que no es Exception y
+   tumbaría el script después de haber mandado ya la cabecera JSON. */
+function campo_texto($valor): string {
+    return is_string($valor) ? trim($valor) : '';
+}
+
+$data  = json_decode(file_get_contents('php://input'), true) ?? [];
+$email = campo_texto($data['email'] ?? null);
+$pass  = is_string($data['password'] ?? null) ? $data['password'] : '';
 
 if (!$email || !$pass) {
     echo json_encode(['ok' => false, 'error' => 'Email y contraseña requeridos']); exit;

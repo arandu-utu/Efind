@@ -340,7 +340,7 @@ async function ocultarCargador(id, nombre) {
     showAlert('alert-cargadores', res.error || 'No se pudo ocultar el cargador.', 'error', 5000);
     return;
   }
-  showAlert('alert-cargadores', `✓ "${nombre}" ya no aparece en el mapa público.`, 'success', 4000);
+  showAlert('alert-cargadores', `✓ "${escapeHtml(nombre)}" ya no aparece en el mapa público.`, 'success', 4000);
   cargarUltimosCargadores();
 }
 

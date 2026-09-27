@@ -139,10 +139,13 @@ function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', peligro
 }
 
 /* ── Escapar HTML antes de insertar texto de usuario con innerHTML ──── */
+/* Escapa para texto y también para atributos. La serialización del DOM no
+   toca las comillas, así que un valor con " se escapaba de un atributo y
+   permitía inyectar otro: hay que sustituirlas a mano. */
 function escapeHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str ?? '';
-  return d.innerHTML;
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* ── Validaciones uruguayas ──────────────────────────────────── */

@@ -48,11 +48,20 @@ try {
     $cap = (float)$veh['capacidad_bateria_kwh'];
     if ($cap <= 0) throw new Exception('El vehículo no tiene una capacidad de batería válida.');
 
-    $stmt = $db->prepare("SELECT nombre, costo_kwh, propietario_id FROM puntos_carga
+    $stmt = $db->prepare("SELECT nombre, costo_kwh, propietario_id, acceso, fuente
+                          FROM puntos_carga
                           WHERE id = :id AND activo = 1");
     $stmt->execute([':id' => $pcid]);
     $p = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$p) throw new Exception('El punto de carga no existe o no está disponible.');
+
+    /* Sólo se reservan los cargadores dados de alta por un particular o una
+       empresa. Los de la red UTE no los opera E-Find, así que no se pueden
+       reservar ni cobrar por adelantado. La ficha ya oculta el botón, pero
+       eso es comodidad de la interfaz: la restricción se decide acá, porque
+       de otro modo alcanza con escribir la dirección de reserva a mano. */
+    if ($p['fuente'] === 'ute' || $p['acceso'] === 'publico')
+        throw new Exception('Este cargador no admite reserva: sólo se reservan los cargadores privados dados de alta en E-Find.');
 
     /* El conector tiene que pertenecer a esta estación, no a otra cualquiera. */
     $stmt = $db->prepare("SELECT potencia_kw FROM conectores
@@ -88,7 +97,7 @@ try {
         'propietario_id'=>$p['propietario_id'] !== null ? (int)$p['propietario_id'] : null,
     ]]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);
 }

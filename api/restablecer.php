@@ -83,7 +83,7 @@ try {
 
     echo json_encode(['ok' => true]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

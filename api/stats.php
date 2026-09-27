@@ -22,7 +22,7 @@ try {
     /* Reseñas pendientes (tabla puede no existir aún) */
     try {
         $resenas_pendientes = (int)$db->query("SELECT COUNT(*) FROM resenas WHERE estado = 'pendiente'")->fetchColumn();
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $resenas_pendientes = 0;
     }
 
@@ -49,7 +49,7 @@ try {
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $porMes[(int)$r['m'] - 1] = (int)$r['c'];
         }
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         /* La columna fecha_creacion no existe: dejamos ceros */
     }
 
@@ -62,7 +62,7 @@ try {
         'cargadores_por_mes'  => array_values($porMes),
     ]]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
 }

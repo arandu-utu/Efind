@@ -324,7 +324,7 @@ function abrirPopup(c) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .6rem;font-size:.82rem;margin:.65rem 0">
       <div><span style="color:var(--soft)">${I18N.t('potencia')}:</span> <strong>${potMax} kW</strong></div>
       <div><span style="color:var(--soft)">${I18N.t('conectores')}:</span> <strong>${conTypes}</strong></div>
-      <div><span style="color:var(--soft)">${I18N.t('horario')}:</span> <strong>${horario}</strong></div>
+      <div><span style="color:var(--soft)">${I18N.t('horario')}:</span> <strong>${escapeHtml(horario)}</strong></div>
       <div><span style="color:var(--soft)">${I18N.t('precio')}:</span> <strong>${precio}</strong></div>
     </div>
     ${fuenteInfo}
