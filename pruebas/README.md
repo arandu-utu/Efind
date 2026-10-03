@@ -1,19 +1,19 @@
 # Batería de pruebas de integración
 
-67 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
+69 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
 real. No son pruebas unitarias con dobles: levantan el sitio, hacen peticiones
 con sesión y cookies como lo haría un navegador, y comprueban tanto la
 respuesta como el estado en que queda la base.
 
 Se usan como criterio de aceptación: cualquier cambio en `api/` o en el
-esquema tiene que dejarlas en 67 de 67 antes de desplegar.
+esquema tiene que dejarlas en 69 de 69 antes de desplegar.
 
 ## Qué cubren
 
 | Grupo | Casos | Qué comprueba |
 |---|---|---|
 | Registro | 11 | Cédula con dígito verificador, RUT, documento y correo repetidos, campos faltantes |
-| Sesiones | 7 | Login, credenciales inválidas, freno de intentos, cierre de sesión, acceso sin sesión |
+| Sesiones | 9 | Login, credenciales inválidas, cierre de sesión, acceso sin sesión |
 | Cargadores | 12 | Alta válida, precio cero, precio negativo, coordenadas fuera de rango, conector desconocido |
 | Estado y cola | 7 | Reporte válido, cargador inexistente, valores fuera de rango |
 | Pagos | 9 | Importe reconstruido en el servidor, vehículo ajeno, conector de otra estación, cargador público rechazado |
@@ -72,3 +72,13 @@ casos cuentan filas.
 `includes/db.php` y `includes/auth.php` no están en el repositorio porque
 tienen credenciales. Para correr la batería en una máquina de desarrollo hay
 que crearlos apuntando a `efind_test`.
+
+## Lo que la batería NO cubre
+
+Se deja constancia explícita para que la cobertura no se dé por mayor de lo que es.
+
+- **El envío real de correo.** Requiere credenciales del servidor, que no están en el
+  repositorio.
+- **La interfaz.** La batería ejercita los endpoints, no el navegador. Las
+  comprobaciones de interfaz, responsive y accesibilidad se hacen a mano y están
+  registradas en el plan de pruebas del documento de entrega.

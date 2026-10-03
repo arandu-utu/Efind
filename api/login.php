@@ -38,12 +38,22 @@ $ip = obtener_ip_real();
 $LIMITE_INTENTOS = 5;
 $VENTANA_MINUTOS = 15;
 
-$stmtCheck = $pdo->prepare("SELECT intentos, ultimo_intento FROM login_intentos WHERE ip = ? AND email = ?");
+/* La diferencia la calcula la propia base. Antes se restaba time() de PHP contra
+   la marca que escribe MariaDB con NOW(): si las zonas horarias de los dos no
+   coinciden —y en Debian y Ubuntu date.timezone viene vacío, con lo que PHP cae
+   en UTC— la resta da horas y el freno no se activa nunca. Comparando dentro del
+   motor, los dos valores salen del mismo reloj y el control deja de depender de
+   la configuración del servidor. */
+$stmtCheck = $pdo->prepare("
+    SELECT intentos, TIMESTAMPDIFF(SECOND, ultimo_intento, NOW()) / 60 AS minutos
+    FROM   login_intentos
+    WHERE  ip = ? AND email = ?
+");
 $stmtCheck->execute([$ip, $email]);
 $intento = $stmtCheck->fetch();
 
 if ($intento) {
-    $minutosDesdeUltimo = (time() - strtotime($intento['ultimo_intento'])) / 60;
+    $minutosDesdeUltimo = (float)$intento['minutos'];
 
     if ($intento['intentos'] >= $LIMITE_INTENTOS && $minutosDesdeUltimo < $VENTANA_MINUTOS) {
         $espera = (int)ceil($VENTANA_MINUTOS - $minutosDesdeUltimo);

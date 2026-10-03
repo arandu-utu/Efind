@@ -92,6 +92,23 @@ caso('sesion', 'Se emite un identificador de sesion nuevo al ingresar', substr_c
 $r = $A->pedir('POST', '/api/login.php', ['email' => "ana$sufijo@test.com", 'password' => 'incorrecta']);
 caso('sesion', 'Credenciales incorrectas son rechazadas con 401', $r['codigo'] === 401);
 
+/* Freno de fuerza bruta. Se usa un correo propio del caso, porque al activarse
+   el freno esa combinacion de IP y correo queda bloqueada quince minutos y
+   arruinaria los casos siguientes. El control estuvo inactivo mucho tiempo: la
+   ventana se medía restando el reloj de PHP contra la marca que escribe la base,
+   y con zonas horarias distintas la diferencia daba horas. */
+$F = new Cliente('freno');
+$correoFreno = "freno$sufijo@test.com";
+$codigos = [];
+for ($i = 1; $i <= 6; $i++) {
+    $rr = $F->pedir('POST', '/api/login.php', ['email' => $correoFreno, 'password' => 'incorrecta']);
+    $codigos[] = $rr['codigo'];
+}
+caso('sesion', 'Los primeros cinco intentos fallidos devuelven 401',
+     array_slice($codigos, 0, 5) === [401, 401, 401, 401, 401], implode(',', $codigos));
+caso('sesion', 'El sexto intento queda frenado con 429',
+     $codigos[5] === 429, 'codigo=' . $codigos[5]);
+
 /* ═════════════════════════════════ CARGADORES ═════════════════════════════ */
 grupo('ALTA DE CARGADORES: VALIDACION DE ENTRADA');
 

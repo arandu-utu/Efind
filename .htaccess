@@ -7,3 +7,7 @@
 
 AddDefaultCharset UTF-8
 AddCharset UTF-8 .js
+
+# El repositorio trae una página de error propia, pero sin esta línea Apache
+# sigue devolviendo la suya.
+ErrorDocument 404 /404.html

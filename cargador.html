@@ -134,6 +134,12 @@ let C = null;   // se rellena con datos de la API
     };
 
     await cargarResenas();
+
+    if (Auth.get()) {
+      vehiculosUsuario = await apiFetch('/api/vehiculos.php')
+        .then(r => r.ok ? r.data : []).catch(() => []);
+    }
+
     renderPage();
 
     /* Viene del botón "Reportar" del mapa (cargador.html?id=X&reportar=1):
@@ -179,6 +185,8 @@ function promEstrellas(resenas) {
   if (!resenas.length) return 0;
   return resenas.reduce((s,r) => s + r.estrellas, 0) / resenas.length;
 }
+
+let vehiculosUsuario = [];
 
 function renderPage() {
   const badgeMap  = { disponible:'badge-green', ocupado:'badge-orange', sin_servicio:'badge-gray' };
@@ -321,7 +329,10 @@ function renderPage() {
   L.marker([C.lat, C.lng]).addTo(mm);
 
   /* Estimador — sin vehículos reales aún (próxima entrega) */
-  montarEstimador(document.getElementById('estimador-widget'), C, []);
+  /* Con la lista vacía el estimador pedía la capacidad a mano aunque la persona
+     ya tuviera el vehículo registrado. Se cargan una sola vez al abrir la página,
+     porque renderPage() también corre al refrescar la cola. */
+  montarEstimador(document.getElementById('estimador-widget'), C, vehiculosUsuario);
 
   I18N.apply(false);
 }

@@ -85,7 +85,7 @@
       <div id="alert-cargadores" role="status" aria-live="polite" style="display:none;margin-bottom:.75rem"></div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Nombre</th><th>Dirección</th><th>Estado</th><th>Conectores</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Acceso</th><th>Estado</th><th>Conectores</th><th>Acciones</th></tr></thead>
           <tbody id="tbody-cargadores"></tbody>
         </table>
       </div>
@@ -167,8 +167,10 @@ const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov'
 function renderStats(s) {
   /* KPIs */
   const kpis = [
-    { label:'Cargadores totales',   value: s.cargadores_total,   diff:'+1 este mes', ico:'bolt'    },
-    { label:'Usuarios registrados', value: s.usuarios_total,     diff:'+2 este mes', ico:'user'    },
+    /* Sin variación mensual: el sistema no la calcula, y un valor escrito a mano
+       afirma algo que no se midió. */
+    { label:'Cargadores totales',   value: s.cargadores_total,   diff:'', ico:'bolt'    },
+    { label:'Usuarios registrados', value: s.usuarios_total,     diff:'', ico:'user'    },
     { label:'Reseñas pendientes',   value: s.resenas_pendientes, diff:'',            ico:'sun'     },
     { label:'Reportes abiertos',    value: s.reportes_abiertos,  diff:'',            ico:'warning' },
   ];
