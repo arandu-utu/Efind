@@ -33,7 +33,8 @@ const Auth = {
     if (!u) return false;
     if (role === 'auth') return true;
     // Soporta tanto rol_id numérico (API real) como string (mock legacy)
-    if (role === 'admin')       return u.rol_id === 1 || u.rol === 'admin' || u.rol === 'moderador';
+    if (role === 'admin')       return u.rol_id === 1 || u.rol === 'admin';
+    if (role === 'moderador')   return u.rol_id === 4 || u.rol === 'moderador';
     if (role === 'propietario') return u.rol_id === 3 || u.rol === 'propietario';
     return u.rol === role;
   },
@@ -190,7 +191,8 @@ function validarRUT(rut) {
 /* ── Inyección dinámica de navbar/footer ─────────────────────── */
 function renderNavbar() {
   const u = Auth.get();
-  const isAdmin = Auth.is('admin');
+  /* El panel lo ven quienes moderan: administración y moderación. */
+  const verPanel = Auth.isAny('admin', 'moderador');
 
   const nav = document.getElementById('navbar');
   if (!nav) return;
@@ -210,7 +212,7 @@ function renderNavbar() {
       </a>
       <div class="navbar__links">
         <a href="index.html" class="nav-link" id="nl-mapa">${t('nav_mapa')}</a>
-        ${isAdmin ? `<a href="admin.html" class="nav-link" id="nl-admin">${t('nav_admin')}</a>` : ''}
+        ${verPanel ? `<a href="admin.html" class="nav-link" id="nl-admin">${t('nav_admin')}</a>` : ''}
         ${u ? `
           <a href="agregar.html" class="btn btn--green btn--sm">${t('nav_agregar')}</a>
           <div class="navbar__user" id="user-menu">
@@ -220,7 +222,7 @@ function renderNavbar() {
             </button>
             <div class="dropdown">
               <a href="perfil.html">${ICONS.user(15)} ${t('nav_perfil')}</a>
-              ${isAdmin ? `<a href="admin.html">${ICONS.settings(15)} ${t('nav_administracion')}</a>` : ''}
+              ${verPanel ? `<a href="admin.html">${ICONS.settings(15)} ${t('nav_administracion')}</a>` : ''}
               <div class="sep"></div>
               <button onclick="Auth.logout(); location.href='login.html'">${ICONS.logout(15)} ${t('nav_logout')}</button>
             </div>
@@ -273,9 +275,9 @@ function requireAuth(redirectTo = 'login.html') {
   return true;
 }
 
-/* ── Guard: redirige si no es admin/moderador ────────────────── */
-function requireAdmin(redirectTo = 'index.html') {
-  if (!Auth.is('admin')) { location.href = redirectTo; return false; }
+/* ── Guard: redirige si no es administrador ni moderador ─────── */
+function requireModeracion(redirectTo = 'index.html') {
+  if (!Auth.isAny('admin', 'moderador')) { location.href = redirectTo; return false; }
   return true;
 }
 

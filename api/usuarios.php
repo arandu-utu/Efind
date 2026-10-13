@@ -20,7 +20,7 @@ try {
 
     /* ── GET: listar usuarios ──────────────────────────────────── */
     if ($method === 'GET') {
-        requiere_rol(1);
+        requiere_rol(ROLES_MODERACION);
 
         $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
         $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
@@ -66,28 +66,38 @@ try {
             ],
         ]);
 
-    /* ── PATCH: cambiar rol o estado ──────────────────────────── */
+    /* ── PATCH: cambiar rol (administrador) o estado (y moderador) ── */
     } elseif ($method === 'PATCH' || $method === 'PUT') {
-        requiere_rol(1);
+        requiere_rol(ROLES_MODERACION);
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $id   = (int)($body['id'] ?? 0);
 
         if (!$id) throw new Exception('id requerido.');
 
-        /* No permitir que el admin se modifique a sí mismo */
-        if ($id === (int)usuario_actual()['id'])
+        /* Nadie se modifica a sí mismo: evita quedarse sin acceso por error. */
+        if ($id === (int)$_SESSION['usuario_id'])
             throw new Exception('No podés modificar tu propia cuenta.');
 
+        $stmt = $db->prepare("SELECT rol_id FROM usuarios WHERE id = ?");
+        $stmt->execute([$id]);
+        $rolDestino = $stmt->fetchColumn();
+        if ($rolDestino === false) throw new Exception('Usuario inexistente.');
+
+        /* Las cuentas con privilegios sólo las toca el administrador: un
+           moderador no suspende a otro moderador ni al administrador. */
+        if (!in_array((int)$rolDestino, [ROL_USUARIO, ROL_PROPIETARIO], true))
+            requiere_rol(ROL_ADMIN);
+
         if (array_key_exists('rol_id', $body)) {
+            requiere_rol(ROL_ADMIN);            // repartir roles es tarea de administración
             $rol_id = (int)$body['rol_id'];
-            if (!in_array($rol_id, [1, 2, 3], true))
+            if (!in_array($rol_id, [ROL_ADMIN, ROL_USUARIO, ROL_PROPIETARIO, ROL_MODERADOR], true))
                 throw new Exception('rol_id inválido.');
             $stmt = $db->prepare("UPDATE usuarios SET rol_id = :r WHERE id = :id");
             $stmt->execute([':r' => $rol_id, ':id' => $id]);
         } elseif (array_key_exists('activo', $body)) {
-            $activo = $body['activo'] ? 1 : 0;
             $stmt = $db->prepare("UPDATE usuarios SET activo = :a WHERE id = :id");
-            $stmt->execute([':a' => $activo, ':id' => $id]);
+            $stmt->execute([':a' => $body['activo'] ? 1 : 0, ':id' => $id]);
         } else {
             throw new Exception('Nada que actualizar: falta rol_id o activo.');
         }

@@ -9,7 +9,7 @@ header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
 
-requiere_rol(1);
+requiere_rol(ROL_ADMIN);
 
 try {
     $db = db_connect();

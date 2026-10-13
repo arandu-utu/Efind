@@ -41,6 +41,7 @@
           <option value="2">Particular</option>
           <option value="3">Propietario</option>
           <option value="1">Admin</option>
+          <option value="4">Moderador</option>
         </select>
         <input type="text" id="f-buscar" class="form-input" style="font-size:.85rem;width:200px"
                placeholder="Buscar nombre o email…" oninput="buscarConRetardo()">
@@ -81,15 +82,16 @@
 
 <script src="js/icons.js"></script>
 <script src="js/i18n.js?v=4"></script>
-<script src="js/auth.js?v=3"></script>
+<script src="js/auth.js?v=4"></script>
 <script>
-requireAdmin();
+requireModeracion();
 const ME = Auth.get();
+const ES_ADMIN = Auth.is('admin');
 document.getElementById('icon-sin-usuarios').innerHTML = ICONS.users(40);
 
-/* rol_id: 1=admin, 2=particular, 3=propietario */
-const ROLES_LABEL = { 1:'Admin', 2:'Particular', 3:'Propietario' };
-const ROLES_BADGE = { 1:'badge-red', 2:'badge-blue', 3:'badge-green' };
+/* rol_id: 1=admin, 2=particular, 3=propietario, 4=moderador */
+const ROLES_LABEL = { 1:'Admin', 2:'Particular', 3:'Propietario', 4:'Moderador' };
+const ROLES_BADGE = { 1:'badge-red', 2:'badge-blue', 3:'badge-green', 4:'badge-orange' };
 
 let usuarios = [];            // sólo la página que se está mostrando
 let paginaActual = 1;
@@ -166,23 +168,29 @@ function renderTabla() {
       <td><span class="badge ${ROLES_BADGE[u.rol_id]||'badge-blue'}">${ROLES_LABEL[u.rol_id]||'Rol '+u.rol_id}</span></td>
       <td style="font-size:.82rem;color:var(--soft)">${fecha}</td>
       <td><span class="badge ${+u.activo ? 'badge-green' : 'badge-gray'}">${+u.activo ? 'Activo' : 'Suspendido'}</span></td>
-      <td>
-        ${esMismo ? '<span style="font-size:.78rem;color:var(--soft)">Tu cuenta</span>' : `
-          <div style="display:flex;gap:.3rem;flex-wrap:wrap">
-            <select class="form-select" style="font-size:.78rem;padding:.25rem .4rem;width:auto"
-                    onchange="cambiarRol(${u.id}, +this.value)">
-              ${Object.entries(ROLES_LABEL).map(([k,v])=>
-                `<option value="${k}" ${+u.rol_id===+k?'selected':''}>${v}</option>`).join('')}
-            </select>
-            <button class="btn btn--sm btn--${+u.activo?'warn':'green'}"
-                    onclick="toggleActivo(${u.id})">
-              ${+u.activo ? 'Suspender' : 'Activar'}
-            </button>
-          </div>
-        `}
-      </td>
+      <td>${acciones(u, esMismo)}</td>
     </tr>`;
   }).join('');
+}
+
+/* ── Acciones de una fila ───────────────────────────────────────
+   El administrador reasigna roles y suspende a cualquiera salvo a sí mismo; el
+   moderador sólo suspende o reactiva cuentas comunes. Es la misma regla que
+   aplica el servidor: esto sólo evita ofrecer botones que serían rechazados. */
+function acciones(u, esMismo) {
+  const nota = t => `<span style="font-size:.78rem;color:var(--soft)">${t}</span>`;
+  if (esMismo) return nota('Tu cuenta');
+  if (!ES_ADMIN && ![2, 3].includes(+u.rol_id)) return nota('Sólo administración');
+  const rol = ES_ADMIN ? `
+    <select class="form-select" style="font-size:.78rem;padding:.25rem .4rem;width:auto"
+            onchange="cambiarRol(${u.id}, +this.value)">
+      ${Object.entries(ROLES_LABEL).map(([k, v]) =>
+        `<option value="${k}" ${+u.rol_id === +k ? 'selected' : ''}>${v}</option>`).join('')}
+    </select>` : '';
+  return `<div style="display:flex;gap:.3rem;flex-wrap:wrap">${rol}
+    <button class="btn btn--sm btn--${+u.activo ? 'warn' : 'green'}" onclick="toggleActivo(${u.id})">
+      ${+u.activo ? 'Suspender' : 'Activar'}
+    </button></div>`;
 }
 
 /* ── Acciones ───────────────────────────────────────────────────── */

@@ -12,7 +12,8 @@
 INSERT INTO roles (id, nombre) VALUES
   (1, 'admin'),
   (2, 'usuario'),
-  (3, 'propietario');
+  (3, 'propietario'),
+  (4, 'moderador');
 
 
 -- -----------------------------------------------------
@@ -39,13 +40,15 @@ INSERT INTO usuarios (nombre, email, password_hash, rol_id) VALUES
    1);
 
 -- -----------------------------------------------------
--- USUARIOS DE EJEMPLO (password de los dos: Usuario1234!)
+-- USUARIOS DE EJEMPLO (password de los tres: Usuario1234!)
 -- Existen para que una instalación limpia permita recorrer el sistema:
--- registrarse no hace falta, y hay un propietario con cargadores propios.
+-- registrarse no hace falta, hay un propietario con cargadores propios y
+-- un moderador para revisar el panel con los permisos de ese perfil.
 -- -----------------------------------------------------
 INSERT INTO usuarios (nombre, email, password_hash, ci_rut, empresa, rol_id) VALUES
   ('Lucía Ferreira', 'lucia@ejemplo.uy', '$2y$12$8x7h9V1s3VKkFJ3AcZfkDeljEA86KTb0RuBjL5qPTwgW5ASx.Yj3C', '12345672', NULL, 2),
-  ('Cargas del Este S.R.L.', 'empresa@ejemplo.uy', '$2y$12$8x7h9V1s3VKkFJ3AcZfkDeljEA86KTb0RuBjL5qPTwgW5ASx.Yj3C', '210001234567', 'Cargas del Este S.R.L.', 3);
+  ('Cargas del Este S.R.L.', 'empresa@ejemplo.uy', '$2y$12$8x7h9V1s3VKkFJ3AcZfkDeljEA86KTb0RuBjL5qPTwgW5ASx.Yj3C', '210001234567', 'Cargas del Este S.R.L.', 3),
+  ('Moderación E-Find', 'moderador@efind.uy', '$2y$12$8x7h9V1s3VKkFJ3AcZfkDeljEA86KTb0RuBjL5qPTwgW5ASx.Yj3C', NULL, NULL, 4);
 
 
 -- -----------------------------------------------------

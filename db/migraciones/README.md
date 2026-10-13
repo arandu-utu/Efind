@@ -130,10 +130,24 @@ mysql -u root -p efind < db/migraciones/004_higiene_datos_prueba.sql
 **Los identificadores son los de producción al 27/09/2026 y no valen para otra
 instalación.** Revisar la lista que imprime antes de confirmar.
 
+## 005 — El rol Moderador
+
+La letra define cuatro perfiles y el Moderador era el único sin rol propio: sus
+tareas las ejercía el administrador. La migración sólo agrega el rol; quién lo
+recibe lo decide el administrador desde la gestión de usuarios.
+
+```bash
+mysql -u root -p efind < db/migraciones/005_rol_moderador.sql
+```
+
+Idempotente. Va **antes** de desplegar el código: `usuarios.php` ya permite
+asignar el rol 4 y, sin esta fila, la clave foránea rechazaría la asignación.
+
 ## Orden de aplicación
 
-Sobre una base existente: 001, 002, 003, 004. Las tres primeras van **antes** de
-desplegar el código que las acompaña; la 004 puede ir después.
+Sobre una base existente: 001, 002, 003, 004, 005. La 001, la 002, la 003 y la
+005 van **antes** de desplegar el código que las acompaña; la 004 puede ir
+después.
 
 Una instalación nueva desde `db/schema.sql` ya incluye todo lo estructural de
 001 y 003, así que sólo necesita el esquema y la semilla.

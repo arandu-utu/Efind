@@ -64,7 +64,7 @@ try {
 
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']); exit; }
 
-    requiere_rol(1);
+    requiere_rol(ROL_ADMIN);
 
     $ctx = stream_context_create([
         'http' => ['method' => 'GET', 'header' => "Accept: application/json\r\nUser-Agent: EFind/1.0\r\n", 'timeout' => 15],

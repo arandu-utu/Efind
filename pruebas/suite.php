@@ -10,6 +10,7 @@ $A    = new Cliente('a');
 $B    = new Cliente('b');
 $ADM  = new Cliente('adm');
 $ANON = new Cliente('anon');
+$MOD  = new Cliente('mod');
 
 /* La base y las credenciales salen del entorno, para que esto corra en otra
    máquina sin editar el archivo. Los valores por defecto son los de un XAMPP
@@ -43,6 +44,7 @@ function ciValida(int $base): string {
 $CI_ANA = ciValida((int)$sufijo);
 $CI_ADM = ciValida((int)$sufijo + 7);
 $CI_LIB = ciValida((int)$sufijo + 13);
+$CI_MOD = ciValida((int)$sufijo + 19);
 $RUT_B  = '12345' . str_pad($sufijo, 7, '0', STR_PAD_LEFT);
 
 /* ══════════════════════════════════ REGISTRO ══════════════════════════════ */
@@ -293,5 +295,55 @@ caso('ocultar', 'Oculto, ya no admite reporte de estado', ($r['cuerpo']['ok'] ??
 
 $r = $ADM->pedir('PATCH', '/api/cargadores.php', ['id' => $idCargador]);
 caso('ocultar', 'Ocultar dos veces informa que ya estaba oculto', ($r['cuerpo']['ok'] ?? true) === false, $r['cuerpo']['error'] ?? '');
+
+/* ═════════════════════════ MODERADOR (HU-04 a HU-06) ══════════════════════ */
+grupo('ROL MODERADOR (HU-04 A HU-06)');
+
+/* Se arma igual que el administrador: alta por la API y rol por SQL. */
+$rm = $MOD->pedir('POST', '/api/registro.php', ['nombre' => 'Moderador', 'email' => "mod$sufijo@test.com",
+    'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_MOD]);
+$idMOD = $rm['cuerpo']['data']['id'] ?? 0;
+$sql->prepare('UPDATE usuarios SET rol_id = 4 WHERE id = ?')->execute([$idMOD]);
+$MOD->pedir('POST', '/api/login.php', ['email' => "mod$sufijo@test.com", 'password' => 'contrasena1']);
+
+/* Material para moderar: un cargador visible con una reseña y un reporte. */
+$idVis = $B->pedir('POST', '/api/cargadores.php', $base)['cuerpo']['data']['id'] ?? 0;
+$idRes = $A->pedir('POST', '/api/resenas.php', ['punto_carga_id' => $idVis, 'estrellas' => 4, 'texto' => 'Bien'])['cuerpo']['data']['id'] ?? 0;
+$idRep = $A->pedir('POST', '/api/reportes.php', ['punto_carga_id' => $idVis, 'tipo' => 'fuera_servicio'])['cuerpo']['data']['id'] ?? 0;
+
+/* Lo que el moderador puede hacer */
+$r = $MOD->pedir('GET', '/api/resenas.php');
+caso('moderador', 'Lista las resenas pendientes', ($r['cuerpo']['ok'] ?? false) === true, 'HTTP ' . $r['codigo']);
+
+$r = $MOD->pedir('PATCH', '/api/resenas.php', ['id' => $idRes, 'estado' => 'aprobada']);
+caso('moderador', 'Aprueba una resena', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+
+$r = $MOD->pedir('PATCH', '/api/reportes.php', ['id' => $idRep]);
+caso('moderador', 'Resuelve un reporte', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+
+$r = $MOD->pedir('PATCH', '/api/cargadores.php', ['id' => $idVis]);
+caso('moderador', 'Oculta un cargador del mapa', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+
+$r = $MOD->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'activo' => false]);
+caso('moderador', 'Suspende una cuenta comun', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+$MOD->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'activo' => true]);       // se repone
+
+/* Lo que queda reservado al administrador */
+$r = $MOD->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'rol_id' => 4]);
+caso('moderador', 'No puede reasignar roles', $r['codigo'] === 403, 'HTTP ' . $r['codigo']);
+
+$r = $MOD->pedir('PATCH', '/api/usuarios.php', ['id' => $idADM, 'activo' => false]);
+caso('moderador', 'No puede suspender al administrador', $r['codigo'] === 403, 'HTTP ' . $r['codigo']);
+
+$r = $MOD->pedir('GET', '/api/stats.php');
+caso('moderador', 'No accede a las estadisticas', $r['codigo'] === 403, 'HTTP ' . $r['codigo']);
+
+$r = $MOD->pedir('POST', '/api/ute-sync.php');
+caso('moderador', 'No dispara la sincronizacion con UTE', $r['codigo'] === 403, 'HTTP ' . $r['codigo']);
+
+/* Y el administrador puede otorgar el rol nuevo */
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'rol_id' => 4]);
+caso('moderador', 'El administrador asigna el rol Moderador', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+$ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'rol_id' => 2]);            // se repone
 
 resumen();

@@ -15,9 +15,9 @@ try {
     $db     = db_connect();
     $method = $_SERVER['REQUEST_METHOD'];
 
-    /* ── GET: listar pendientes (admin) ──────────────────────── */
+    /* ── GET: listar pendientes (administración y moderación) ── */
     if ($method === 'GET') {
-        requiere_rol(1);
+        requiere_rol(ROLES_MODERACION);
 
         $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
         $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
@@ -103,9 +103,9 @@ try {
         ]);
         echo json_encode(['ok' => true, 'data' => ['id' => $db->lastInsertId()]]);
 
-    /* ── PATCH: resolver reporte (admin) ─────────────────────── */
+    /* ── PATCH: resolver reporte (administración y moderación) ─ */
     } elseif ($method === 'PATCH' || $method === 'PUT') {
-        requiere_rol(1);
+        requiere_rol(ROLES_MODERACION);
         $body   = json_decode(file_get_contents('php://input'), true) ?? [];
         $id  = (int)($body['id'] ?? 0);
         $uid = usuario_actual()['id'] ?? null;

@@ -21,9 +21,8 @@ try {
 
     /* ── PATCH: ocultar del mapa público (HU-05) ──────────────── */
     if ($method === 'PATCH' || $method === 'PUT') {
-        /* Hoy la moderación la ejerce el administrador. Cuando exista el rol
-           Moderador como perfil propio, la guarda admite también ese rol. */
-        requiere_rol(1);
+        /* Ocultar un cargador del mapa público es tarea de moderación (HU-05). */
+        requiere_rol(ROLES_MODERACION);
 
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $id   = (int)($body['id'] ?? 0);
