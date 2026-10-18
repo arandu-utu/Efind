@@ -1,7 +1,7 @@
 /**
  * E-Find — Estimador de tiempo de carga
  *
- * Fórmula física (Sección 10 de la documentación):
+ * Fórmula física (sección 9 de la documentación):
  *   E_necesaria = C × (1 − SOC)          [kWh]
  *   t = E_necesaria / (P × η)            [horas]
  *
@@ -26,8 +26,11 @@ function calcularCarga(capacidad_kwh, soc_pct, potencia_kw) {
   const e_necesaria = capacidad_kwh * (1 - soc);          // kWh a cargar
   const t_horas     = e_necesaria / (potencia_kw * ETA);  // tiempo en horas
 
-  const h = Math.floor(t_horas);
-  const m = Math.round((t_horas - h) * 60);
+  // Se redondea el total en minutos y después se separa: redondear sólo la
+  // fracción daba «5 h 60 min» cuando los minutos rozaban la hora siguiente.
+  const total_min = Math.round(t_horas * 60);
+  const h = Math.floor(total_min / 60);
+  const m = total_min % 60;
 
   let texto;
   if (t_horas < 1/60) {

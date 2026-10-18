@@ -1,25 +1,26 @@
 # Batería de pruebas de integración
 
-69 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
+79 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
 real. No son pruebas unitarias con dobles: levantan el sitio, hacen peticiones
 con sesión y cookies como lo haría un navegador, y comprueban tanto la
 respuesta como el estado en que queda la base.
 
 Se usan como criterio de aceptación: cualquier cambio en `api/` o en el
-esquema tiene que dejarlas en 69 de 69 antes de desplegar.
+esquema tiene que dejarlas en 79 de 79 antes de desplegar.
 
 ## Qué cubren
 
 | Grupo | Casos | Qué comprueba |
 |---|---|---|
-| Registro | 11 | Cédula con dígito verificador, RUT, documento y correo repetidos, campos faltantes |
-| Sesiones | 9 | Login, credenciales inválidas, cierre de sesión, acceso sin sesión |
-| Cargadores | 12 | Alta válida, precio cero, precio negativo, coordenadas fuera de rango, conector desconocido |
-| Estado y cola | 7 | Reporte válido, cargador inexistente, valores fuera de rango |
-| Pagos | 9 | Importe reconstruido en el servidor, vehículo ajeno, conector de otra estación, cargador público rechazado |
+| Registro | 7 | Cédula con dígito verificador, RUT, documento y correo repetidos, campos faltantes |
+| Sesiones | 8 | Login, credenciales inválidas, cierre de sesión, acceso sin sesión y freno de intentos |
+| Cargadores | 15 | Alta válida, precio cero, precio negativo, coordenadas fuera de rango, conector desconocido |
+| Pagos | 11 | Importe reconstruido en el servidor, vehículo ajeno, conector de otra estación, cargador público rechazado |
 | Calificaciones | 7 | Transacción propia, ya calificada, destinatario que no corresponde, autocalificación |
+| Estado y cola | 7 | Reporte válido, cargador inexistente, valores fuera de rango |
 | Reseñas y reportes | 4 | Cargador existente e inexistente |
 | Ocultar del mapa (HU-05) | 10 | Permisos, efecto en la base, y que un cargador oculto no se pueda pagar, reseñar ni reportar |
+| Rol Moderador (HU-04 a HU-06) | 10 | Lo que el moderador puede hacer, y que lo reservado al administrador le responda 403 |
 
 ## Cómo se corren
 
