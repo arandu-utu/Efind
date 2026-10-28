@@ -50,36 +50,46 @@ $RUT_B  = '12345' . str_pad($sufijo, 7, '0', STR_PAD_LEFT);
 /* ══════════════════════════════════ REGISTRO ══════════════════════════════ */
 grupo('REGISTRO Y DOCUMENTO DUPLICADO');
 
-$r = $A->pedir('POST', '/api/registro.php', ['nombre' => 'Ana Cliente', 'email' => "ana$sufijo@test.com",
+$r = $A->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Ana Cliente', 'email' => "ana$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_ANA]);
 caso('registro', 'Alta de usuario particular con cedula valida', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
 $idA = $r['cuerpo']['data']['id'] ?? 0;
 
 $T = new Cliente('descarte');
-$r = $T->pedir('POST', '/api/registro.php', ['nombre' => 'Otro', 'email' => "otro$sufijo@test.com",
+$r = $T->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Otro', 'email' => "otro$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_ANA]);
 caso('registro', 'La misma cedula en otro formato es rechazada', ($r['cuerpo']['ok'] ?? true) === false, $r['cuerpo']['error'] ?? '');
 
-$r = $T->pedir('POST', '/api/registro.php', ['nombre' => 'Otro', 'email' => "ana$sufijo@test.com",
+$r = $T->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Otro', 'email' => "ana$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_LIB]);
 caso('registro', 'Correo duplicado es rechazado', ($r['cuerpo']['ok'] ?? true) === false);
 
-$r = $T->pedir('POST', '/api/registro.php', ['nombre' => 'Malo', 'email' => "malo$sufijo@test.com",
+$r = $T->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Malo', 'email' => "malo$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'particular', 'ci' => '12345678']);
 caso('registro', 'Cedula con digito verificador invalido es rechazada', ($r['cuerpo']['ok'] ?? true) === false);
 
-$r = $T->pedir('POST', '/api/registro.php', ['nombre' => 'Corto', 'email' => "corto$sufijo@test.com",
+$r = $T->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Corto', 'email' => "corto$sufijo@test.com",
     'password' => 'abc', 'rol' => 'particular', 'ci' => $CI_LIB]);
 caso('registro', 'Contrasena de menos de 8 caracteres rechazada', ($r['cuerpo']['ok'] ?? true) === false);
 
-$r = $B->pedir('POST', '/api/registro.php', ['nombre' => 'Beto Propietario', 'email' => "beto$sufijo@test.com",
+$r = $B->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Beto Propietario', 'email' => "beto$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'empresa', 'ci' => $RUT_B, 'empresa' => 'Cargas SRL']);
 caso('registro', 'Alta de empresa con RUT valido', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
 $idB = $r['cuerpo']['data']['id'] ?? 0;
 
-$r = $T->pedir('POST', '/api/registro.php', ['nombre' => 'Clon', 'email' => "clon$sufijo@test.com",
+$r = $T->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Clon', 'email' => "clon$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'empresa', 'ci' => $RUT_B, 'empresa' => 'Otra SRL']);
 caso('registro', 'RUT duplicado es rechazado', ($r['cuerpo']['ok'] ?? true) === false, $r['cuerpo']['error'] ?? '');
+
+$r = $T->pedir('POST', '/api/registro.php', ['nombre' => 'Sin Aceptar', 'email' => "noacepta$sufijo@test.com",
+    'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_LIB, 'acepta' => 'si']);
+$guardado = $sql->prepare('SELECT COUNT(*) FROM usuarios WHERE email = ?');
+$guardado->execute(["noacepta$sufijo@test.com"]);
+caso('registro', 'Sin aceptar los terminos no se crea la cuenta',
+     ($r['cuerpo']['ok'] ?? true) === false && (int)$guardado->fetchColumn() === 0, $r['cuerpo']['error'] ?? '');
+$guardado = $sql->prepare('SELECT terminos_aceptados_en FROM usuarios WHERE id = ?');
+$guardado->execute([$idA]);
+caso('registro', 'La cuenta guarda la fecha de aceptacion', $guardado->fetchColumn() !== null);
 
 /* ══════════════════════════════════ SESION ════════════════════════════════ */
 grupo('SESION Y COOKIE');
@@ -114,7 +124,7 @@ caso('sesion', 'El sexto intento queda frenado con 429',
 /* ═════════════════════════════════ CARGADORES ═════════════════════════════ */
 grupo('ALTA DE CARGADORES: VALIDACION DE ENTRADA');
 
-$ra = $ADM->pedir('POST', '/api/registro.php', ['nombre' => 'Admin', 'email' => "adm$sufijo@test.com",
+$ra = $ADM->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Admin', 'email' => "adm$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_ADM]);
 $idADM = $ra['cuerpo']['data']['id'] ?? 0;
 $sql->prepare('UPDATE usuarios SET rol_id = 1 WHERE id = ?')->execute([$idADM]);
@@ -300,7 +310,7 @@ caso('ocultar', 'Ocultar dos veces informa que ya estaba oculto', ($r['cuerpo'][
 grupo('ROL MODERADOR (HU-04 A HU-06)');
 
 /* Se arma igual que el administrador: alta por la API y rol por SQL. */
-$rm = $MOD->pedir('POST', '/api/registro.php', ['nombre' => 'Moderador', 'email' => "mod$sufijo@test.com",
+$rm = $MOD->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => 'Moderador', 'email' => "mod$sufijo@test.com",
     'password' => 'contrasena1', 'rol' => 'particular', 'ci' => $CI_MOD]);
 $idMOD = $rm['cuerpo']['data']['id'] ?? 0;
 $sql->prepare('UPDATE usuarios SET rol_id = 4 WHERE id = ?')->execute([$idMOD]);

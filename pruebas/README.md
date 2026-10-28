@@ -1,18 +1,18 @@
 # Batería de pruebas de integración
 
-79 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
+81 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
 real. No son pruebas unitarias con dobles: levantan el sitio, hacen peticiones
 con sesión y cookies como lo haría un navegador, y comprueban tanto la
 respuesta como el estado en que queda la base.
 
 Se usan como criterio de aceptación: cualquier cambio en `api/` o en el
-esquema tiene que dejarlas en 79 de 79 antes de desplegar.
+esquema tiene que dejarlas en 81 de 81 antes de desplegar.
 
 ## Qué cubren
 
 | Grupo | Casos | Qué comprueba |
 |---|---|---|
-| Registro | 7 | Cédula con dígito verificador, RUT, documento y correo repetidos, campos faltantes |
+| Registro | 9 | Cédula con dígito verificador, RUT, documento y correo repetidos, campos faltantes, aceptación de los términos |
 | Sesiones | 8 | Login, credenciales inválidas, cierre de sesión, acceso sin sesión y freno de intentos |
 | Cargadores | 15 | Alta válida, precio cero, precio negativo, coordenadas fuera de rango, conector desconocido |
 | Pagos | 11 | Importe reconstruido en el servidor, vehículo ajeno, conector de otra estación, cargador público rechazado |

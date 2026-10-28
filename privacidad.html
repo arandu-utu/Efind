@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon"             type="image/x-icon"  href="img/favicon.ico">
+  <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
+  <meta name="theme-color"     content="#1A2E44">
+  <title>Política de privacidad — E-Find</title>
+  <link rel="stylesheet" href="css/style.css?v=3">
+  <meta name="description" content="Qué datos personales trata E-Find, para qué, con quién se comparten y cómo ejercer los derechos de la Ley N.º 18.331.">
+</head>
+<body>
+<nav class="navbar" id="navbar"></nav>
+
+<main class="main-content page-enter">
+<div class="container-sm">
+<article class="card legal">
+  <h1>Política de privacidad</h1>
+  <p class="legal-fecha">Vigente desde el 27 de octubre de 2026</p>
+
+  <p>Esta política explica qué datos personales trata E-Find, con qué finalidad y cómo ejercer los derechos que reconoce la Ley N.º 18.331 de Protección de Datos Personales y Acción de Habeas Data. El responsable de la base de datos es el equipo Arandú, desarrollador de la plataforma, con contacto en <a href="mailto:arandu.utu@gmail.com">arandu.utu@gmail.com</a>.</p>
+
+  <h2>1. Qué datos se recogen</h2>
+  <ul>
+    <li><strong>Cuenta:</strong> nombre, correo electrónico, cédula de identidad o RUT, razón social en las cuentas de empresa, y la fecha de alta y de aceptación de estas condiciones. La contraseña no se guarda: sólo se conserva su resumen criptográfico (bcrypt), que no permite reconstruirla.</li>
+    <li><strong>Vehículos:</strong> marca, modelo, año, capacidad de batería, autonomía y tipo de conector, para el estimador de carga y las reservas.</li>
+    <li><strong>Actividad:</strong> reservas, operaciones de pago con su recibo, calificaciones, reseñas, reportes de estado y cargadores dados de alta.</li>
+    <li><strong>Seguridad:</strong> la dirección IP y el correo de los intentos de ingreso fallidos, que se borran al ingresar correctamente, y los códigos de recuperación de contraseña, guardados como resumen y con vencimiento.</li>
+  </ul>
+  <p>Los datos de tarjeta del pago simulado se validan en el navegador y no se envían al servidor.</p>
+
+  <h2>2. Para qué se usan</h2>
+  <ul>
+    <li>Identificar al usuario y mantener su sesión.</li>
+    <li>Evitar cuentas duplicadas: la cédula o el RUT impide que una misma persona abra varias cuentas, por ejemplo para eludir una suspensión.</li>
+    <li>Gestionar reservas, pagos, comprobantes y la reputación entre usuarios y propietarios.</li>
+    <li>Enviar el correo de recuperación de contraseña cuando el usuario lo solicita.</li>
+    <li>Proteger la plataforma frente a intentos de acceso indebido.</li>
+  </ul>
+  <p>No se venden ni se ceden datos con fines comerciales, y no se usan para publicidad.</p>
+
+  <h2>3. Qué ven otros usuarios</h2>
+  <p>El nombre del usuario aparece junto a las reseñas y calificaciones que publica. La cédula, el RUT, el correo y los vehículos no se muestran a otros usuarios.</p>
+
+  <h2>4. Dónde se guardan y con quién se comparten</h2>
+  <p>La base de datos funciona en un servidor propio ubicado en Uruguay, sin puertos abiertos a internet y con acceso restringido. Las copias de seguridad se guardan en ese mismo servidor, con permisos restringidos, y se eliminan a los 14 días. Intervienen además estos servicios externos:</p>
+  <ul>
+    <li><strong>Cloudflare:</strong> publica el sitio y cifra la conexión (HTTPS). Por su red pasa el tráfico entre el navegador y el servidor.</li>
+    <li><strong>OpenStreetMap y unpkg:</strong> sirven las imágenes del mapa y la biblioteca que lo dibuja. Reciben la dirección IP del navegador al cargar el mapa.</li>
+    <li><strong>Nominatim (OpenStreetMap):</strong> recibe la dirección que se escribe al dar de alta un cargador, para ubicarla en el mapa.</li>
+    <li><strong>Gmail:</strong> envía el correo de recuperación de contraseña, por lo que recibe la dirección de destino.</li>
+  </ul>
+
+  <h2>5. Cookies y almacenamiento del navegador</h2>
+  <p>El sitio usa una única cookie, la de sesión, que no es accesible desde JavaScript y se borra al cerrar la sesión. En el almacenamiento local del navegador se guardan el idioma elegido y una copia de los datos básicos de la cuenta para mostrar la barra de navegación. No se usan cookies de publicidad ni de analítica.</p>
+
+  <h2>6. Cuánto tiempo se conservan</h2>
+  <p>Los datos de la cuenta se conservan mientras la cuenta esté activa. Las operaciones de pago se conservan como registro contable aun después de que se suprima la cuenta, porque sostienen los comprobantes y la reputación de los propietarios con los que se operó.</p>
+
+  <h2>7. Derechos del titular</h2>
+  <p>El titular puede solicitar el acceso a sus datos, su rectificación, actualización o inclusión, y su supresión, escribiendo a <a href="mailto:arandu.utu@gmail.com">arandu.utu@gmail.com</a> desde el correo registrado. La solicitud se responde en los plazos que fija la Ley N.º 18.331. Si la cuenta tiene operaciones de pago, la supresión desactiva la cuenta y conserva sólo los datos imprescindibles de ese registro. Ante una respuesta insatisfactoria, el titular puede recurrir a la Unidad Reguladora y de Control de Datos Personales (URCDP).</p>
+
+  <h2>8. Cambios</h2>
+  <p>Esta política puede actualizarse. La fecha de vigencia de esta página indica la última versión.</p>
+</article>
+</div>
+</main>
+
+<footer class="site-footer" id="footer"></footer>
+
+<script src="js/icons.js"></script>
+<script src="js/i18n.js?v=5"></script>
+<script src="js/auth.js?v=5"></script>
+</body>
+</html>

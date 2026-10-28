@@ -37,6 +37,7 @@ CREATE TABLE usuarios (
   password_hash  VARCHAR(255) NOT NULL,
   rol_id         TINYINT UNSIGNED NOT NULL DEFAULT 2,
   activo         TINYINT(1) NOT NULL DEFAULT 1,
+  terminos_aceptados_en DATETIME NULL,  -- consentimiento de la Ley 18.331; NULL en cuentas anteriores al 27/10/2026
   creado_en      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_ci_rut (ci_rut),

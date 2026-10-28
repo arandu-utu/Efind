@@ -256,7 +256,7 @@ function renderFooter() {
         <img src="img/efind-nav.png" alt="E-Find" height="28">
         <span style="color:rgba(255,255,255,.55);font-size:.8rem">${t('footer_tagline')}</span>
       </div>
-      <span style="color:rgba(255,255,255,.4);font-size:.8rem">${t('footer_proyecto')}</span>
+      <span style="color:rgba(255,255,255,.4);font-size:.8rem">${t('footer_proyecto')} · <a href="terminos.html">${t('footer_terminos')}</a> · <a href="privacidad.html">${t('footer_privacidad')}</a></span>
       <div class="footer-brand">
         <span style="color:rgba(255,255,255,.4);font-size:.75rem">${t('footer_dev')}</span>
         <img src="img/arandu-dark.png" alt="Arandú" height="28">

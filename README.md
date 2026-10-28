@@ -85,6 +85,8 @@ efind-frontend/
 ├── perfil.html         # Perfil del usuario
 ├── admin.html          # Panel de administración
 ├── usuarios.html       # Gestión de usuarios
+├── terminos.html       # Términos y condiciones
+├── privacidad.html     # Política de privacidad (Ley 18.331)
 ├── 404.html
 ├── api/
 │   ├── login.php / registro.php / logout.php

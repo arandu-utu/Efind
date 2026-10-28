@@ -143,11 +143,25 @@ mysql -u root -p efind < db/migraciones/005_rol_moderador.sql
 Idempotente. Va **antes** de desplegar el código: `usuarios.php` ya permite
 asignar el rol 4 y, sin esta fila, la clave foránea rechazaría la asignación.
 
+## 006 — Fecha de aceptación de los términos
+
+El registro exige aceptar los Términos y condiciones y la Política de
+privacidad. La Ley 18.331 pide consentimiento expreso y que quien trata los
+datos pueda demostrarlo, así que `usuarios` guarda cuándo se aceptó.
+
+```bash
+mysql -u root -p efind < db/migraciones/006_aceptacion_terminos.sql
+```
+
+Idempotente. Va **antes** de desplegar el código: `registro.php` ya escribe la
+columna. Las cuentas anteriores quedan con `NULL`, que es lo que corresponde:
+no aceptaron nada todavía.
+
 ## Orden de aplicación
 
-Sobre una base existente: 001, 002, 003, 004, 005. La 001, la 002, la 003 y la
-005 van **antes** de desplegar el código que las acompaña; la 004 puede ir
-después.
+Sobre una base existente: 001, 002, 003, 004, 005, 006. La 001, la 002, la
+003, la 005 y la 006 van **antes** de desplegar el código que las acompaña; la
+004 puede ir después.
 
 Una instalación nueva desde `db/schema.sql` ya incluye todo lo estructural de
-001 y 003, así que sólo necesita el esquema y la semilla.
+001, 003 y 006, así que sólo necesita el esquema y la semilla.

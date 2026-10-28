@@ -215,6 +215,16 @@ table.data-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .footer-inner { max-width: 1280px; margin: 0 auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
 .footer-inner strong { color: rgba(255,255,255,.9); }
 .footer-brand { display:flex; align-items:center; gap:.5rem; }
+.footer-inner a { color: rgba(255,255,255,.7); }
+.footer-inner a:hover { color: #fff; }
+
+/* ── Páginas legales ─────────────────────────────────────────── */
+.legal h1 { font-size: 1.35rem; font-weight: 900; color: var(--nav); }
+.legal h2 { font-size: 1rem; font-weight: 800; color: var(--nav); margin: 1.5rem 0 .4rem; }
+.legal p, .legal li { font-size: .9rem; line-height: 1.65; }
+.legal p + p { margin-top: .6rem; }
+.legal ul { padding-left: 1.2rem; margin-top: .4rem; }
+.legal-fecha { font-size: .8rem; color: var(--soft); margin: .25rem 0 1rem; }
 
 /* ── Container genérico ──────────────────────────────────────── */
 .container { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }

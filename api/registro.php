@@ -4,6 +4,7 @@
  * POST — registro de nuevo usuario.
  * Tipo de cuenta "particular" -> rol_id 2, valida CI uruguaya.
  * Tipo de cuenta "empresa"    -> rol_id 3 (propietario), valida RUT + razón social.
+ * En ambos casos exige aceptar los términos y registra la fecha de aceptación.
  */
 require_once '../includes/db.php';
 require_once '../includes/sesion.php';
@@ -47,6 +48,12 @@ $empresa  = campo_texto($body['empresa'] ?? null);
 if (!$nombre || !$email || !$password || !$ci) {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Datos incompletos']);
+    exit;
+}
+/* Consentimiento de la Ley 18.331: sin aceptación expresa no se guarda ningún
+   dato. Se exige el booleano true, no un valor que sólo parezca verdadero. */
+if (($body['acepta'] ?? null) !== true) {
+    echo json_encode(['ok' => false, 'error' => 'Tenés que aceptar los términos y la política de privacidad']);
     exit;
 }
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -106,8 +113,8 @@ $rolId = $rol === 'empresa' ? 3 : 2;
 // Crear usuario con bcrypt cost 12
 $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
 $stmt = $pdo->prepare(
-    "INSERT INTO usuarios (nombre, email, password_hash, ci_rut, empresa, rol_id, activo)
-     VALUES (?, ?, ?, ?, ?, ?, 1)"
+    "INSERT INTO usuarios (nombre, email, password_hash, ci_rut, empresa, rol_id, activo, terminos_aceptados_en)
+     VALUES (?, ?, ?, ?, ?, ?, 1, NOW())"
 );
 $stmt->execute([$nombre, $email, $hash, $ciNormalizado, $empresa, $rolId]);
 $nuevo_id = $pdo->lastInsertId();
