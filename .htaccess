@@ -11,3 +11,18 @@ AddCharset UTF-8 .js
 # El repositorio trae una página de error propia, pero sin esta línea Apache
 # sigue devolviendo la suya.
 ErrorDocument 404 /404.html
+
+# Archivos del repositorio que no forman parte del sitio.
+<FilesMatch "^(README\.md|\.gitignore)$">
+  Require all denied
+</FilesMatch>
+
+# Cabeceras de seguridad. Requieren mod_headers (a2enmod headers).
+# Referrer-Policy importa sobre todo en restablecer.html: el token de
+# recuperación viaja en la URL y no debe filtrarse a otro sitio.
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
