@@ -35,7 +35,7 @@ Navegador  ->  HTML/JS  ->  /api/*.php  ->  MariaDB
 |---|---|---|---|
 | `/api/registro.php` | POST | Público | Registro de usuario. Particular valida CI, empresa valida RUT |
 | `/api/login.php` | POST | Público | Inicio de sesión con límite de intentos por IP y email |
-| `/api/logout.php` | GET | Sesión | Cierre de sesión |
+| `/api/logout.php` | POST | Sesión | Cierre de sesión |
 | `/api/recuperar.php` | POST | Público | Solicita el restablecimiento de contraseña y envía el enlace |
 | `/api/restablecer.php` | GET / POST | Token | Valida el token y fija la contraseña nueva |
 | `/api/estaciones.php` | GET | Público | Lista los cargadores activos con sus conectores |

@@ -8,8 +8,8 @@
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
   <title>Agregar cargador — E-Find</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
+  <link rel="stylesheet" href="css/style.css?v=4">
   <meta name="description" content="Registrá tu punto de carga en el mapa colaborativo de VE de Uruguay.">
   <meta property="og:title"       content="Agregar cargador — E-Find">
   <meta property="og:description" content="Registrá tu punto de carga en el mapa colaborativo de VE de Uruguay.">
@@ -140,10 +140,10 @@
 
 <footer class="site-footer" id="footer"></footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
 <script src="js/icons.js"></script>
-<script src="js/i18n.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
 <script>
 requireAuth();
 
@@ -269,7 +269,7 @@ function renderResumen() {
       ].map(([k,v]) => `
         <tr style="border-bottom:1px solid var(--border)">
           <td style="padding:.5rem .25rem;color:var(--soft);width:40%">${k}</td>
-          <td style="padding:.5rem .25rem;font-weight:700">${v}</td>
+          <td style="padding:.5rem .25rem;font-weight:700">${escapeHtml(v)}</td>
         </tr>`).join('')}
     </table>`;
 }

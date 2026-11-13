@@ -8,8 +8,8 @@
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
   <title>Detalle de cargador — E-Find</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin=""/>
+  <link rel="stylesheet" href="css/style.css?v=4">
   <style>
     .stars-display { display:flex; gap:2px; align-items:center; }
     .stars-display .s { color:#C8D3DF; transition:color .1s; }
@@ -86,13 +86,13 @@
 
 <footer class="site-footer" id="footer"></footer>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/report-types.js"></script>
-<script src="js/i18n.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
-<script src="js/estimador.js?v=2"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
+<script src="js/estimador.js?v=3"></script>
 <script>
 /* ── Carga de datos desde la API real ───────────────────────── */
 const ID = +cargadorIdFromURL();
@@ -170,7 +170,7 @@ function mostrarError(msg) {
   document.getElementById('page-content').innerHTML = `
     <div style="text-align:center;padding:4rem 1rem">
       ${ICONS.warning(56)}
-      <h2>${msg}</h2>
+      <h2>${escapeHtml(msg)}</h2>
       <a href="index.html" class="btn btn--primary" style="margin-top:1rem">Volver al mapa</a>
     </div>`;
 }
@@ -193,8 +193,11 @@ function renderPage() {
   const labelMap  = { disponible:'Disponible', ocupado:'Ocupado', sin_servicio:'Sin servicio' };
   const potMax    = C.conectores.length ? Math.max(...C.conectores.map(x=>x.potencia)) : '—';
   const prom      = promEstrellas(C.resenas);
-  const precio    = C.fuente === 'ute' ? 'Consultar tarifa UTE' : (C.costo_kwh ? `$${C.costo_kwh}/kWh` : 'Gratuito');
-  const colaText  = C.cola > 0 ? `${ICONS.clock(13)} ${C.cola} vehículo${C.cola>1?'s':''} en cola` : 'Sin espera';
+  const precio    = C.fuente === 'ute' ? 'Consultar tarifa UTE' : (C.costo_kwh ? `$${escapeHtml(C.costo_kwh)}/kWh` : 'Gratuito');
+  const es        = I18N.get() === 'es';
+  const colaText  = C.cola > 0
+    ? `${ICONS.clock(13)} ${C.cola} ${es ? `vehículo${C.cola>1?'s':''} en cola` : `vehicle${C.cola>1?'s':''} in queue`}`
+    : 'Sin espera';
   const colaColor = C.cola > 0 ? 'var(--warn)' : 'var(--green)';
   const colaFlex  = 'display:inline-flex;align-items:center;gap:.3rem';
 
@@ -235,7 +238,7 @@ function renderPage() {
             <div style="font-size:.78rem;font-weight:700;color:var(--soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.4rem">Conectores disponibles</div>
             ${C.conectores.map(x => `
               <span class="conector-pill">
-                ${ICONS.bolt(14)} ${x.tipo} · ${x.potencia} kW
+                ${ICONS.bolt(14)} ${escapeHtml(x.tipo)} · ${+x.potencia} kW
               </span>`).join('')}
           </div>
         </div>
@@ -252,7 +255,7 @@ function renderPage() {
               <div style="font-size:2.5rem;font-weight:900;color:var(--nav)">${prom.toFixed(1)}</div>
               <div>
                 <div class="stars-display">${stars(Math.round(prom))}</div>
-                <div style="font-size:.8rem;color:var(--soft)">${C.resenas.length} reseña${C.resenas.length>1?'s':''}</div>
+                <div style="font-size:.8rem;color:var(--soft)">${C.resenas.length} ${es ? 'reseña' : 'review'}${C.resenas.length>1?'s':''}</div>
               </div>
             </div>
             <hr class="divider">
@@ -260,7 +263,7 @@ function renderPage() {
               <div class="resena-item">
                 <div style="display:flex;justify-content:space-between;align-items:center">
                   <strong style="font-size:.9rem">${escapeHtml(r.usuario)}</strong>
-                  <span style="font-size:.78rem;color:var(--soft)">${r.fecha}</span>
+                  <span style="font-size:.78rem;color:var(--soft)">${escapeHtml(r.fecha)}</span>
                 </div>
                 <div class="stars-display" style="margin:.3rem 0">${stars(r.estrellas)}</div>
                 <p style="font-size:.85rem;color:var(--text)">${escapeHtml(r.texto)}</p>
@@ -270,7 +273,7 @@ function renderPage() {
 
         <!-- Acciones -->
         <div style="display:flex;gap:.6rem;flex-wrap:wrap">
-          <a href="https://maps.google.com/?q=${C.lat},${C.lng}" target="_blank" class="btn btn--outline">
+          <a href="https://maps.google.com/?q=${C.lat},${C.lng}" target="_blank" rel="noopener" class="btn btn--outline">
             ${ICONS.pin(14)} Cómo llegar
           </a>
           ${U ? `
@@ -349,12 +352,7 @@ function abrirResena() {
 }
 function cerrarResena() { document.getElementById('modal-resena').style.display = 'none'; }
 
-/* Escape cierra el modal que esté abierto. */
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  if (document.getElementById('modal-resena').style.display  === 'flex') cerrarResena();
-  if (document.getElementById('modal-reporte').style.display === 'flex') cerrarReporte();
-});
+/* Escape y el foco de los modales los gestiona auth.js. */
 
 async function enviarResena() {
   if (!pickerResena?.valor) {

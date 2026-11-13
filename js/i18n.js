@@ -300,6 +300,28 @@ window.I18N = {
     'Dirección': 'Address',
     'Coordenadas': 'Coordinates',
     'Gratuito': 'Free',
+    'Sin datos': 'No data',
+    'Fuente: Red UTE · CargaME': 'Source: UTE Network · CargaME',
+    '50 kW + (DC rápido)': '50 kW + (DC fast)',
+    'Sin dirección registrada': 'No address on file',
+    'Saltar al contenido': 'Skip to content',
+    'Buscar cargador o dirección': 'Search charger or address',
+    'Reportar estado en tiempo real': 'Report real-time status',
+    'Conector / Potencia': 'Connector / Power',
+    'Capacidad batería (kWh)': 'Battery capacity (kWh)',
+    'Capacidad manual': 'Manual capacity',
+    'Estado de carga actual': 'Current charge level',
+    'Batería completa': 'Battery full',
+    'kWh a cargar': 'kWh to charge',
+    'No se pudo registrar la calificación.': 'The rating could not be saved.',
+    'Elegí el vehículo que vas a cargar antes de continuar.': 'Choose the vehicle you will charge before continuing.',
+    'No se pudo procesar el pago.': 'The payment could not be processed.',
+    'No tenés vehículos registrados': 'You have no registered vehicles',
+    'Para reservar una carga necesitás registrar un vehículo. Podés hacerlo en': 'To reserve a charge you need to register a vehicle. You can do it in',
+    'tu perfil': 'your profile',
+    'Demasiados intentos. Esperá un momento y probá de nuevo.': 'Too many attempts. Wait a moment and try again.',
+    'Tu sesión venció.': 'Your session has expired.',
+    'El servidor devolvió una respuesta inesperada.': 'The server returned an unexpected response.',
     'Consultar tarifa UTE': 'Check UTE rate',
     'Acceso': 'Access',
     'Guardando…': 'Saving…',
@@ -538,6 +560,7 @@ window.I18N = {
 
     document.querySelectorAll('.lang-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.lang === this.get());
+      b.setAttribute('aria-pressed', b.dataset.lang === this.get());
     });
 
     if (rebuildNav) {

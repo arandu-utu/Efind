@@ -7,8 +7,9 @@
   <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
+  <meta name="robots" content="noindex">
   <title>Gestión de usuarios — E-Find</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
   <meta name="description" content="Administrá roles y estados de los usuarios registrados en E-Find.">
   <meta property="og:title"       content="Gestión de usuarios — E-Find">
   <meta property="og:description" content="Administrá roles y estados de los usuarios registrados en E-Find.">
@@ -81,8 +82,8 @@
 <footer class="site-footer" id="footer"></footer>
 
 <script src="js/icons.js"></script>
-<script src="js/i18n.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
 <script>
 requireModeracion();
 const ME = Auth.get();
@@ -160,7 +161,7 @@ function renderTabla() {
         <div style="display:flex;align-items:center;gap:.6rem">
           <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);
                       display:flex;align-items:center;justify-content:center;
-                      font-size:.82rem;font-weight:900;color:#fff;flex-shrink:0">${inicial}</div>
+                      font-size:.82rem;font-weight:900;color:#fff;flex-shrink:0">${escapeHtml(inicial)}</div>
           <div style="font-weight:700;font-size:.88rem">${escapeHtml(u.nombre)}</div>
         </div>
       </td>

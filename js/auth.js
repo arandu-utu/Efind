@@ -25,7 +25,7 @@ const Auth = {
     // Destruir sesión PHP en el servidor (fire & forget)
     /* keepalive: sin él, la navegación que suele venir justo después cancela
        la petición y la sesión del servidor sobrevive al cierre de sesión. */
-    fetch('/api/logout.php', { keepalive: true }).catch(() => {});
+    fetch('/api/logout.php', { method: 'POST', keepalive: true }).catch(() => {});
   },
 
   is(role) {
@@ -63,19 +63,26 @@ async function apiFetch(url, method = 'GET', body) {
   }
 
   /* Un error del servidor puede devolver HTML en lugar de JSON. */
+  let json;
   try {
-    return await res.json();
+    json = await res.json();
   } catch {
-    return { ok: false, error: 'El servidor devolvió una respuesta inesperada.' };
+    json = { ok: false, error: 'El servidor devolvió una respuesta inesperada.' };
   }
+  /* 429: el servidor limita la frecuencia; si no trae mensaje, se explica. */
+  if (res.status === 429 && !json.error) json.error = 'Demasiados intentos. Esperá un momento y probá de nuevo.';
+  if (!res.ok) json.ok = false;
+  return json;
 }
 
 /* ── Muestra un <div class="alert"> ya existente en la página ────────
-   ocultarMs > 0 lo vuelve a esconder solo pasado ese tiempo. */
-function showAlert(id, msg, tipo = 'error', ocultarMs = 0) {
+   ocultarMs > 0 lo vuelve a esconder solo pasado ese tiempo. El mensaje va
+   como texto; `html` es solo para mensajes propios que llevan un enlace. */
+function showAlert(id, msg, tipo = 'error', ocultarMs = 0, html = false) {
   const el = document.getElementById(id);
   el.className = `alert alert-${tipo}`;
-  el.innerHTML = msg;
+  el.setAttribute('role', 'alert');
+  if (html) el.innerHTML = msg; else el.textContent = I18N.autoT(msg);
   el.style.display = 'flex';
   if (ocultarMs) setTimeout(() => el.style.display = 'none', ocultarMs);
 }
@@ -137,8 +144,8 @@ function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', peligro
     const ov = document.createElement('div');
     ov.className = 'modal-overlay center';
     ov.innerHTML = `
-      <div class="modal" role="dialog" aria-modal="true" style="max-width:400px">
-        <div class="modal__title">${t(titulo)}</div>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmar-titulo" style="max-width:400px">
+        <div class="modal__title" id="confirmar-titulo">${t(titulo)}</div>
         <p style="font-size:.9rem;color:var(--soft);line-height:1.5">${t(mensaje)}</p>
         <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem">
           <button class="btn btn--ghost btn--sm" data-r="0">${t('Cancelar')}</button>
@@ -146,9 +153,11 @@ function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', peligro
         </div>
       </div>`;
 
+    const previo = document.activeElement;
     const cerrar = valor => {
       document.removeEventListener('keydown', alTeclear);
       ov.remove();
+      previo?.focus?.();
       resolve(valor);
     };
     const alTeclear = e => { if (e.key === 'Escape') cerrar(false); };
@@ -163,6 +172,34 @@ function confirmar(mensaje, { titulo = 'Confirmar', aceptar = 'Aceptar', peligro
     ov.querySelector('[data-r="1"]').focus();
   });
 }
+
+/* ── Foco de los modales (los que llevan id y se abren con display:flex).
+   Al abrir: se guarda el elemento activo y se enfoca el cierre. Al cerrar se
+   devuelve el foco. Escape cierra y Tab no se sale del cuadro. ──────────── */
+(function gestionFocoModales() {
+  let previo = null;
+  const abierto = () => [...document.querySelectorAll('.modal-overlay[id]')].find(o => o.style.display === 'flex');
+  new MutationObserver(ms => ms.forEach(m => {
+    const o = m.target, antes = (m.oldValue || '').includes('flex');
+    if (!o.matches?.('.modal-overlay[id]')) return;
+    if (o.style.display === 'flex' && !antes) {
+      previo = document.activeElement;
+      (o.querySelector('.modal__close') || o.querySelector('button, input, select, textarea, a[href]'))?.focus();
+    } else if (o.style.display !== 'flex' && antes) previo?.focus?.();
+  })).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['style'], attributeOldValue: true });
+
+  document.addEventListener('keydown', e => {
+    const o = abierto();
+    if (!o) return;
+    if (e.key === 'Escape') return o.querySelector('.modal__close')?.click();
+    if (e.key !== 'Tab') return;
+    const f = [...o.querySelectorAll('button, input, select, textarea, a[href]')].filter(x => !x.disabled && x.offsetParent);
+    if (!f.length) return;
+    const [a, z] = [f[0], f[f.length - 1]];
+    if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+    else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+  });
+})();
 
 /* ── Escapar HTML antes de insertar texto de usuario con innerHTML ──── */
 /* Escapa para texto y también para atributos. La serialización del DOM no
@@ -201,8 +238,8 @@ function renderNavbar() {
   const lang = I18N.get();
   const langToggle = `
     <div class="lang-toggle">
-      <button class="lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es" onclick="I18N.set('es')">ES</button>
-      <button class="lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en" onclick="I18N.set('en')">EN</button>
+      <button class="lang-btn${lang === 'es' ? ' active' : ''}" data-lang="es" aria-pressed="${lang === 'es'}" onclick="I18N.set('es')">ES</button>
+      <button class="lang-btn${lang === 'en' ? ' active' : ''}" data-lang="en" aria-pressed="${lang === 'en'}" onclick="I18N.set('en')">EN</button>
     </div>`;
 
   nav.innerHTML = `
@@ -283,6 +320,13 @@ function requireModeracion(redirectTo = 'index.html') {
 
 /* ── Init automático ─────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  /* Enlace para saltar la barra de navegación con el teclado. */
+  const main = document.querySelector('main');
+  if (main) {
+    main.id = main.id || 'contenido';
+    main.tabIndex = -1;
+    document.body.insertAdjacentHTML('afterbegin', `<a class="skip-link" href="#${main.id}">Saltar al contenido</a>`);
+  }
   renderNavbar();
   renderFooter();
 });

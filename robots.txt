@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /api/
+Disallow: /admin.html
+Disallow: /perfil.html
+Disallow: /usuarios.html
+Disallow: /restablecer.html
+
+Sitemap: https://efindapp.com/sitemap.xml

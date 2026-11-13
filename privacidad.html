@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
   <title>Política de privacidad — E-Find</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
   <meta name="description" content="Qué datos personales trata E-Find, para qué, con quién se comparten y cómo ejercer los derechos de la Ley N.º 18.331.">
 </head>
 <body>
@@ -27,7 +27,7 @@
     <li><strong>Cuenta:</strong> nombre, correo electrónico, cédula de identidad o RUT, razón social en las cuentas de empresa, y la fecha de alta y de aceptación de estas condiciones. La contraseña no se guarda: sólo se conserva su resumen criptográfico (bcrypt), que no permite reconstruirla.</li>
     <li><strong>Vehículos:</strong> marca, modelo, año, capacidad de batería, autonomía y tipo de conector, para el estimador de carga y las reservas.</li>
     <li><strong>Actividad:</strong> reservas, operaciones de pago con su recibo, calificaciones, reseñas, reportes de estado y cargadores dados de alta.</li>
-    <li><strong>Seguridad:</strong> la dirección IP y el correo de los intentos de ingreso fallidos, que se borran al ingresar correctamente, y los códigos de recuperación de contraseña, guardados como resumen y con vencimiento.</li>
+    <li><strong>Seguridad:</strong> la dirección IP y el correo de los intentos de ingreso fallidos, que se borran al ingresar correctamente o, como máximo, al cabo de un día; un contador de uso por dirección IP o por usuario (registros, ingresos, recuperaciones, reseñas, reportes y altas), que se conserva dos días para limitar abusos; y los códigos de recuperación de contraseña, guardados como resumen, con vencimiento y borrados siete días después de vencer.</li>
   </ul>
   <p>Los datos de tarjeta del pago simulado se validan en el navegador y no se envían al servidor.</p>
 
@@ -54,13 +54,13 @@
   </ul>
 
   <h2>5. Cookies y almacenamiento del navegador</h2>
-  <p>El sitio usa una única cookie, la de sesión, que no es accesible desde JavaScript y se borra al cerrar la sesión. En el almacenamiento local del navegador se guardan el idioma elegido y una copia de los datos básicos de la cuenta para mostrar la barra de navegación. No se usan cookies de publicidad ni de analítica.</p>
+  <p>El sitio usa una única cookie, la de sesión, que no es accesible desde JavaScript, se elimina al cerrar el navegador o la sesión, y vence tras un período de inactividad. En el almacenamiento local del navegador se guardan el idioma elegido y una copia de los datos básicos de la cuenta para mostrar la barra de navegación. No se usan cookies de publicidad ni de analítica.</p>
 
   <h2>6. Cuánto tiempo se conservan</h2>
-  <p>Los datos de la cuenta se conservan mientras la cuenta esté activa. Las operaciones de pago se conservan como registro contable aun después de que se suprima la cuenta, porque sostienen los comprobantes y la reputación de los propietarios con los que se operó.</p>
+  <p>Los datos de la cuenta se conservan mientras la cuenta esté activa y, si se desactiva, hasta que el titular solicite su supresión. Las operaciones de pago se conservan como registro contable aun después de que se suprima la cuenta, porque sostienen los comprobantes y la reputación de los propietarios con los que se operó.</p>
 
   <h2>7. Derechos del titular</h2>
-  <p>El titular puede solicitar el acceso a sus datos, su rectificación, actualización o inclusión, y su supresión, escribiendo a <a href="mailto:arandu.utu@gmail.com">arandu.utu@gmail.com</a> desde el correo registrado. La solicitud se responde en los plazos que fija la Ley N.º 18.331. Si la cuenta tiene operaciones de pago, la supresión desactiva la cuenta y conserva sólo los datos imprescindibles de ese registro. Ante una respuesta insatisfactoria, el titular puede recurrir a la Unidad Reguladora y de Control de Datos Personales (URCDP).</p>
+  <p>El titular puede solicitar el acceso a sus datos, su rectificación, actualización o inclusión, y su supresión, escribiendo a <a href="mailto:arandu.utu@gmail.com">arandu.utu@gmail.com</a> desde el correo registrado. La solicitud se responde en los plazos que fija la Ley N.º 18.331. La supresión anonimiza el nombre, el correo, la cédula o el RUT y la empresa, elimina los vehículos y da de baja la cuenta y sus cargadores. Se conservan, sin datos que identifiquen a la persona, las operaciones de pago, las calificaciones, las reseñas ya publicadas y los reportes. Ante una respuesta insatisfactoria, el titular puede recurrir a la Unidad Reguladora y de Control de Datos Personales (URCDP).</p>
 
   <h2>8. Cambios</h2>
   <p>Esta política puede actualizarse. La fecha de vigencia de esta página indica la última versión.</p>
@@ -71,7 +71,7 @@
 <footer class="site-footer" id="footer"></footer>
 
 <script src="js/icons.js"></script>
-<script src="js/i18n.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
 </body>
 </html>

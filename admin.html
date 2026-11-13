@@ -7,8 +7,9 @@
   <link rel="icon"             type="image/png"     href="img/favicon-32.png" sizes="32x32">
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
+  <meta name="robots" content="noindex">
   <title>Panel Admin — E-Find</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
   <meta name="description" content="Gestión centralizada de cargadores, usuarios, reseñas y reportes de la plataforma E-Find.">
   <meta property="og:title"       content="Panel de administración — E-Find">
   <meta property="og:description" content="Gestión centralizada de cargadores, usuarios, reseñas y reportes de la plataforma E-Find.">
@@ -98,8 +99,8 @@
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/report-types.js"></script>
-<script src="js/i18n.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
 <script>
 requireModeracion();
 
@@ -277,7 +278,7 @@ function renderReportes() {
         <td>${huerfano
             ? `<span style="color:var(--soft)" title="El cargador ya no existe en la base">Cargador #${r.punto_carga_id} (eliminado)</span>`
             : `<a href="cargador.html?id=${r.punto_carga_id}">${escapeHtml(r.punto_carga_nombre)}</a>`}</td>
-        <td>${REPORT_TIPOS[r.tipo] || r.tipo}</td>
+        <td>${escapeHtml(REPORT_TIPOS[r.tipo] || r.tipo)}</td>
         <td style="font-size:.82rem">${escapeHtml(r.descripcion) || '—'}</td>
         <td>${escapeHtml(r.usuario_nombre) || '—'}</td>
         <td>${r.creado_en ? r.creado_en.slice(0,10) : ''}</td>
@@ -319,10 +320,10 @@ async function resolverReporte(id, puntoCargaId) {
 const badgeMap = { disponible:'badge-green', ocupado:'badge-orange', sin_servicio:'badge-gray' };
 function renderCargadores(lista) {
   document.getElementById('tbody-cargadores').innerHTML = lista.map(c=>{
-    const tipos = [...new Set((c.conectores||[]).map(x=>x.tipo))].join(', ') || '—';
+    const tipos = escapeHtml([...new Set((c.conectores||[]).map(x=>x.tipo))].join(', ')) || '—';
     return `<tr>
     <td><a href="cargador.html?id=${c.id}">${escapeHtml(c.nombre)}</a> ${c.fuente==='ute' ? '<span class="badge badge-ute" style="font-size:.6rem;padding:.1rem .35rem">UTE</span>' : ''}</td>
-    <td style="font-size:.82rem;color:var(--soft)">${c.acceso || ''}</td>
+    <td style="font-size:.82rem;color:var(--soft)">${escapeHtml(c.acceso)}</td>
     <td><span class="badge ${badgeMap[c.estado]||''}">${c.estado}</span></td>
     <td style="font-size:.82rem">${tipos}</td>
     <td style="white-space:nowrap">
@@ -350,7 +351,7 @@ async function ocultarCargador(id, nombre) {
     showAlert('alert-cargadores', res.error || 'No se pudo ocultar el cargador.', 'error', 5000);
     return;
   }
-  showAlert('alert-cargadores', `✓ "${escapeHtml(nombre)}" ya no aparece en el mapa público.`, 'success', 4000);
+  showAlert('alert-cargadores', `✓ "${nombre}" ya no aparece en el mapa público.`, 'success', 4000);
   cargarUltimosCargadores();
 }
 

@@ -8,7 +8,7 @@
   <link rel="apple-touch-icon"                      href="img/apple-touch-icon.png">
   <meta name="theme-color"     content="#1A2E44">
   <title>Reservar carga — E-Find</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
   <style>
     .pago-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
     .monto-row { display:flex; justify-content:space-between; align-items:center;
@@ -150,8 +150,8 @@
 
 <script src="js/mock-data.js"></script>
 <script src="js/icons.js"></script>
-<script src="js/i18n.js?v=5"></script>
-<script src="js/auth.js?v=5"></script>
+<script src="js/i18n.js?v=6"></script>
+<script src="js/auth.js?v=6"></script>
 <script>
   /* ── Calificación post-pago ─────────────────────────────────── */
   let pickerCalificacion = null;
@@ -175,7 +175,7 @@
       '<p style="color:var(--green);font-weight:600;text-align:center;padding:.75rem">✓ ¡Gracias por tu calificación!</p>';
   }
 </script>
-<script src="js/estimador.js?v=2"></script>
+<script src="js/estimador.js?v=3"></script>
 <script>
 requireAuth();
 const U = Auth.get();
@@ -201,7 +201,7 @@ async function init() {
 
   document.getElementById('resumen-cargador').innerHTML = `
     <strong>${escapeHtml(C.nombre)}</strong> &nbsp;·&nbsp; ${escapeHtml(C.direccion)}<br>
-    <span style="color:var(--soft)">${escapeHtml(C.horario)} &nbsp;·&nbsp; ${C.fuente === 'ute' ? 'Consultar tarifa UTE' : (C.costo_kwh ? '$'+C.costo_kwh+'/kWh' : 'Gratuito')}</span>`;
+    <span style="color:var(--soft)">${escapeHtml(C.horario)} &nbsp;·&nbsp; ${C.fuente === 'ute' ? 'Consultar tarifa UTE' : (C.costo_kwh ? '$'+escapeHtml(C.costo_kwh)+'/kWh' : 'Gratuito')}</span>`;
 
   /* Vehículos del usuario */
   const sel  = document.getElementById('sel-vehiculo');
@@ -221,7 +221,7 @@ async function init() {
     sel.disabled = true;
     showAlert('alert-sin-vehiculo',
       'Para reservar una carga necesitás registrar un vehículo. Podés hacerlo en <a href="perfil.html">tu perfil</a>.',
-      'info');
+      'info', 0, true);
   }
 
   /* Conectores */
@@ -326,7 +326,8 @@ async function pagar() {
   if (!res.ok) {
     const al = document.getElementById('pago-alert');
     al.className = 'alert alert-error';
-    al.innerHTML = res.error || 'No se pudo procesar el pago.';
+    al.textContent = I18N.autoT(res.error || 'No se pudo procesar el pago.');
+    al.setAttribute('role', 'alert');
     al.style.display = 'flex';
     const btn = document.getElementById('btn-pagar');
     btn.disabled = false; btn.textContent = 'Confirmar y pagar';

@@ -22,6 +22,10 @@ const ETA = 0.92;  // eficiencia estándar de carga AC/DC
  * @returns {{ horas: number, texto: string, kwh: number }}
  */
 function calcularCarga(capacidad_kwh, soc_pct, potencia_kw) {
+  // Sin datos válidos no hay estimación: evita mostrar «Infinity h» o «NaN».
+  if (!(capacidad_kwh > 0) || !(potencia_kw > 0) || !Number.isFinite(soc_pct))
+    return { horas: 0, texto: '—', kwh: 0 };
+
   const soc = Math.max(0, Math.min(100, soc_pct)) / 100;
   const e_necesaria = capacidad_kwh * (1 - soc);          // kWh a cargar
   const t_horas     = e_necesaria / (potencia_kw * ETA);  // tiempo en horas
@@ -66,32 +70,32 @@ function calcularCosto(kwh, costo_kwh) {
  */
 function montarEstimador(contenedor, cargador, vehiculos = []) {
   const conectoresOpts = cargador.conectores
-    .map((c, i) => `<option value="${i}">${c.tipo} — ${c.potencia} kW</option>`)
+    .map((c, i) => `<option value="${i}">${escapeHtml(c.tipo)} — ${+c.potencia} kW</option>`)
     .join('');
 
   const vehiculosOpts = vehiculos.length
-    ? vehiculos.map(v => `<option value="${v.capacidad_kwh}">${v.marca} ${v.modelo} (${v.capacidad_kwh} kWh)</option>`).join('')
+    ? vehiculos.map(v => `<option value="${+v.capacidad_kwh}">${escapeHtml(v.marca)} ${escapeHtml(v.modelo)} (${+v.capacidad_kwh} kWh)</option>`).join('')
     : '<option value="60">Capacidad manual</option>';
 
   contenedor.innerHTML = `
     <div class="form-group">
-      <label class="form-label">Conector / Potencia</label>
+      <label class="form-label" for="est-conector">Conector / Potencia</label>
       <select id="est-conector" class="form-select">${conectoresOpts}</select>
     </div>
     ${vehiculos.length ? `
     <div class="form-group" style="margin-top:.65rem">
-      <label class="form-label">Mi vehículo</label>
+      <label class="form-label" for="est-vehiculo">Mi vehículo</label>
       <select id="est-vehiculo" class="form-select">${vehiculosOpts}</select>
     </div>` : `
     <div class="form-group" style="margin-top:.65rem">
-      <label class="form-label">Capacidad batería (kWh)</label>
+      <label class="form-label" for="est-vehiculo">Capacidad batería (kWh)</label>
       <input id="est-vehiculo" type="number" class="form-input" value="60" min="10" max="200" step="1">
     </div>`}
     <div class="form-group" style="margin-top:.65rem">
-      <label class="form-label">
+      <label class="form-label" for="est-soc">
         Estado de carga actual: <strong id="est-soc-val">20%</strong>
       </label>
-      <input id="est-soc" type="range" min="0" max="99" value="20" style="width:100%;accent-color:var(--accent)">
+      <input id="est-soc" type="range" min="0" max="99" value="20" aria-label="Estado de carga actual" style="width:100%;accent-color:var(--accent)">
     </div>
     <div class="estimador-result" id="est-result">
       <div class="estimador-time" id="est-time">—</div>
@@ -101,17 +105,23 @@ function montarEstimador(contenedor, cargador, vehiculos = []) {
   `;
 
   const recalc = () => {
-    const potencia = cargador.conectores[+document.getElementById('est-conector').value]?.potencia || 7.4;
+    const potencia = cargador.conectores[+document.getElementById('est-conector').value]?.potencia;
     const cap      = parseFloat(document.getElementById('est-vehiculo').value) || 60;
     const soc      = +document.getElementById('est-soc').value;
 
     document.getElementById('est-soc-val').textContent = soc + '%';
 
     const r = calcularCarga(cap, soc, potencia);
-    document.getElementById('est-time').textContent  = r.texto;
-    document.getElementById('est-kwh').textContent   = `${r.kwh} kWh a cargar`;
-    document.getElementById('est-costo').textContent = calcularCosto(r.kwh, cargador.costo_kwh);
+    /* Los textos fijos pasan por autoT: se calculan en JS y el recorrido de
+       I18N.apply() no los vuelve a traducir al cambiar de idioma. */
+    const t = s => window.I18N ? I18N.autoT(s) : s;
+    document.getElementById('est-time').textContent  = t(r.texto);
+    document.getElementById('est-kwh').textContent   = `${r.kwh} ${t('kWh a cargar')}`;
+    document.getElementById('est-costo').textContent = t(calcularCosto(r.kwh, cargador.costo_kwh));
   };
+  /* Un solo oyente aunque el widget se vuelva a montar. */
+  window.removeEventListener('i18n:change', window.__estRecalc);
+  window.addEventListener('i18n:change', window.__estRecalc = recalc);
 
   contenedor.querySelectorAll('select, input').forEach(el => {
     el.addEventListener('input', recalc);

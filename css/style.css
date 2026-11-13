@@ -374,3 +374,10 @@ hr.divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 
 .empty-state__icon { color: var(--border); margin-bottom: .25rem; }
 .empty-state__title { font-size: .97rem; font-weight: 700; color: var(--text); }
 .empty-state__body { font-size: .84rem; color: var(--soft); max-width: 280px; line-height: 1.55; }
+
+/* ── Accesibilidad ─────────────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.navbar :focus-visible, .site-footer :focus-visible { outline-color: #fff; }
+.skip-link { position: absolute; left: .5rem; top: -4rem; z-index: 2000; background: var(--nav); color: #fff; padding: .6rem 1rem; border-radius: var(--radius); font-weight: 600; }
+.skip-link:focus { top: .5rem; text-decoration: none; }
+.charger-item:focus-visible { outline-offset: -2px; }
