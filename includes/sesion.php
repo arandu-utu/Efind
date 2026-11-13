@@ -21,6 +21,10 @@ function iniciar_sesion_segura(): void
     $es_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
              || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
 
+    /* Sin esto Ubuntu descarta las sesiones inactivas a los 24 minutos; el valor del
+       servidor (php.ini) también debe ser SESION_INACTIVIDAD para la limpieza programada. */
+    ini_set('session.gc_maxlifetime', (string)SESION_INACTIVIDAD);
+
     session_set_cookie_params([
         'lifetime' => 0,
         'path'     => '/',
@@ -30,6 +34,37 @@ function iniciar_sesion_segura(): void
     ]);
 
     session_start();
+    if (isset($_SESSION['usuario_id'])) revalidar_sesion();
+}
+
+const SESION_INACTIVIDAD = 8 * 3600;   // segundos sin actividad antes de pedir ingreso de nuevo
+
+/**
+ * Comprueba en cada petición que la cuenta sigue activa y toma el rol vigente
+ * de la base. Así una suspensión o un cambio de rol rige de inmediato, en lugar
+ * de esperar a que la persona cierre sesión, y una sesión abandonada vence.
+ * Si la base no responde se conserva la sesión: el endpoint fallará por su cuenta.
+ */
+function revalidar_sesion(): void
+{
+    if (time() - ($_SESSION['actividad'] ?? time()) > SESION_INACTIVIDAD) { vaciar_sesion(); return; }
+    $_SESSION['actividad'] = time();
+    try {
+        require_once __DIR__ . '/db.php';
+        $s = db_connect()->prepare('SELECT rol_id, activo FROM usuarios WHERE id = :id');
+        $s->execute([':id' => $_SESSION['usuario_id']]);
+        $u = $s->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return; }
+    if (!$u || !(int)$u['activo']) { vaciar_sesion(); return; }
+    $_SESSION['rol_id'] = (int)$u['rol_id'];
+}
+
+/* Borra los datos y renueva el identificador, dejando la sesión abierta y vacía
+   (así un ingreso posterior en la misma petición sigue funcionando). */
+function vaciar_sesion(): void
+{
+    $_SESSION = [];
+    session_regenerate_id(true);
 }
 
 /**

@@ -5,20 +5,20 @@
  */
 header('Content-Type: application/json');
 require_once '../includes/db.php';
+require_once '../includes/errores.php';
 
 try {
     $id = (int)($_GET['id'] ?? 0);
-    if (!$id) { echo json_encode(['ok' => false, 'error' => 'ID requerido']); exit; }
+    if ($id < 1) throw new Exception('ID requerido', 400);
 
     $pdo  = db_connect();
-    $stmt = $pdo->prepare("SELECT * FROM puntos_carga WHERE id = ? AND activo = 1");
+    $stmt = $pdo->prepare("SELECT id, nombre, descripcion, direccion, ciudad, departamento, horario, costo_kwh,
+                lat, lng, acceso, estado, cola, fuente, propietario_id
+         FROM puntos_carga WHERE id = ? AND activo = 1");
     $stmt->execute([$id]);
     $estacion = $stmt->fetch();
 
-    if (!$estacion) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'error' => 'Estación no encontrada']); exit;
-    }
+    if (!$estacion) throw new Exception('Estación no encontrada', 404);
 
     $stmt = $pdo->prepare(
         "SELECT c.id, c.estado, c.potencia_kw,
@@ -33,6 +33,5 @@ try {
     echo json_encode(['ok' => true, 'data' => $estacion]);
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

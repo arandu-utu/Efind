@@ -13,6 +13,7 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
 
 try {
     $db     = db_connect();
@@ -23,7 +24,7 @@ try {
         requiere_rol(ROLES_MODERACION);
 
         $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
-        $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
+        $pagina    = min(max((int)($_GET['pagina'] ?? 1), 1), 100000);
         $offset    = ($pagina - 1) * $porPagina;
 
         $where = [];
@@ -32,7 +33,7 @@ try {
             $where[] = 'rol_id = :rol';
             $params[':rol'] = (int)$_GET['rol'];
         }
-        $q = trim($_GET['q'] ?? '');
+        $q = substr(campo_texto($_GET['q'] ?? null), 0, 100);
         if ($q !== '') {
             /* Se escapan % y _ para que el usuario los busque como texto
                literal en vez de como comodines de LIKE. */
@@ -74,14 +75,14 @@ try {
 
         if (!$id) throw new Exception('id requerido.');
 
-        /* Nadie se modifica a sí mismo: evita quedarse sin acceso por error. */
-        if ($id === (int)$_SESSION['usuario_id'])
-            throw new Exception('No podés modificar tu propia cuenta.');
+        /* Nadie cambia su propio rol ni se desactiva: evita quedarse sin acceso por error. */
+        if ($id === (int)usuario_actual()['id'])
+            throw new Exception('No podés modificar tu propia cuenta.', 409);
 
         $stmt = $db->prepare("SELECT rol_id FROM usuarios WHERE id = ?");
         $stmt->execute([$id]);
         $rolDestino = $stmt->fetchColumn();
-        if ($rolDestino === false) throw new Exception('Usuario inexistente.');
+        if ($rolDestino === false) throw new Exception('Usuario inexistente.', 404);
 
         /* Las cuentas con privilegios sólo las toca el administrador: un
            moderador no suspende a otro moderador ni al administrador. */
@@ -90,14 +91,18 @@ try {
 
         if (array_key_exists('rol_id', $body)) {
             requiere_rol(ROL_ADMIN);            // repartir roles es tarea de administración
-            $rol_id = (int)$body['rol_id'];
+            $rol_id = is_numeric($body['rol_id']) ? (int)$body['rol_id'] : 0;
             if (!in_array($rol_id, [ROL_ADMIN, ROL_USUARIO, ROL_PROPIETARIO, ROL_MODERADOR], true))
                 throw new Exception('rol_id inválido.');
             $stmt = $db->prepare("UPDATE usuarios SET rol_id = :r WHERE id = :id");
             $stmt->execute([':r' => $rol_id, ':id' => $id]);
         } elseif (array_key_exists('activo', $body)) {
-            $stmt = $db->prepare("UPDATE usuarios SET activo = :a WHERE id = :id");
-            $stmt->execute([':a' => $body['activo'] ? 1 : 0, ':id' => $id]);
+            /* Booleano estricto: "false" o "0" no pueden contar como verdadero. */
+            $v = $body['activo'];
+            if (in_array($v, [true, 1, '1', 'true'], true)) $a = 1;
+            elseif (in_array($v, [false, 0, '0', 'false'], true)) $a = 0;
+            else throw new Exception('activo debe ser true o false.');
+            $db->prepare("UPDATE usuarios SET activo = :a WHERE id = :id")->execute([':a' => $a, ':id' => $id]);
         } else {
             throw new Exception('Nada que actualizar: falta rol_id o activo.');
         }
@@ -109,6 +114,5 @@ try {
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

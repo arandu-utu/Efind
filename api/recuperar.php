@@ -15,6 +15,8 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/smtp.php';
+require_once '../includes/errores.php';
+require_once '../includes/limite.php';
 
 const RESET_VALIDEZ_MINUTOS = 60;
 const RESET_MAX_POR_HORA    = 3;
@@ -32,7 +34,7 @@ try {
 
     $db    = db_connect();
     $body  = json_decode(file_get_contents('php://input'), true) ?? [];
-    $email = trim($body['email'] ?? '');
+    $email = campo_texto($body['email'] ?? null);
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(400);
@@ -43,6 +45,11 @@ try {
     $stmt = $db->prepare("SELECT id, nombre FROM usuarios WHERE email = :email AND activo = 1");
     $stmt->execute([':email' => $email]);
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    /* Por IP, para que no se use como fuente de spam ni para sondear direcciones.
+       Se cuenta antes de buscar la cuenta, así existan o no consumen igual. Al
+       superarlo sale 429 igual para cualquier correo, sin revelar nada. */
+    limitar($db, 'recuperar:ip:' . ip_cliente(), 10, 3600);
 
     /* Cuenta inexistente o dada de baja: cortamos acá, con la misma respuesta. */
     if (!$usuario) { echo json_encode($RESPUESTA_GENERICA); exit; }
@@ -115,6 +122,5 @@ try {
     echo json_encode($RESPUESTA_GENERICA);
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

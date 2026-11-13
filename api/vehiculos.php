@@ -15,6 +15,8 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
+require_once '../includes/limite.php';
 
 try {
     $db = db_connect();
@@ -38,18 +40,25 @@ try {
     } elseif ($method === 'POST') {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
-        $marca  = trim($body['marca']  ?? '');
-        $modelo = trim($body['modelo'] ?? '');
-        $cap    = (float)($body['capacidad_kwh'] ?? 0);
-        $tipo   = trim($body['tipo_conector'] ?? '');
+        $marca  = campo_texto($body['marca']  ?? null);
+        $modelo = campo_texto($body['modelo'] ?? null);
+        $cap    = is_numeric($body['capacidad_kwh'] ?? null) ? (float)$body['capacidad_kwh'] : 0;
+        $tipo   = campo_texto($body['tipo_conector'] ?? null);
 
         if (!$marca || !$modelo || !$tipo || $cap < 1 || $cap > 300)
-            throw new Exception('Datos inválidos: marca, modelo, capacidad (1-300 kWh) y tipo de conector son obligatorios.');
+            throw new Exception('Datos inválidos: marca, modelo, capacidad (1-300 kWh) y tipo de conector son obligatorios.', 400);
+        if (mb_strlen($marca) > 40 || mb_strlen($modelo) > 40)
+            throw new Exception('Marca y modelo no pueden superar los 40 caracteres.', 422);
 
         $stmt = $db->prepare("SELECT id FROM tipos_conector WHERE nombre = :nombre");
         $stmt->execute([':nombre' => $tipo]);
         $tipoRow = $stmt->fetch();
-        if (!$tipoRow) throw new Exception("Tipo de conector desconocido: \"$tipo\".");
+        if (!$tipoRow) throw new Exception("Tipo de conector desconocido: \"$tipo\".", 422);
+
+        $stmt = $db->prepare("SELECT COUNT(*) FROM vehiculos WHERE usuario_id = :uid AND activo = 1");
+        $stmt->execute([':uid' => $u['id']]);
+        if ((int)$stmt->fetchColumn() >= 10) throw new Exception('Alcanzaste el máximo de 10 vehículos. Dá de baja alguno para agregar otro.', 409);
+        limitar($db, 'vehiculo:u' . $u['id'], 10, 86400);
 
         $stmt = $db->prepare("
             INSERT INTO vehiculos (usuario_id, marca, modelo, capacidad_bateria_kwh, tipo_conector_id)
@@ -66,21 +75,20 @@ try {
 
     } elseif ($method === 'DELETE') {
         $id = (int)($_GET['id'] ?? 0);
-        if (!$id) throw new Exception('Falta el id del vehículo.');
+        if (!$id) throw new Exception('Falta el id del vehículo.', 400);
 
         $stmt = $db->prepare("UPDATE vehiculos SET activo = 0 WHERE id = :id AND usuario_id = :uid");
         $stmt->execute([':id' => $id, ':uid' => $u['id']]);
 
         if ($stmt->rowCount() === 0)
-            throw new Exception('Vehículo no encontrado.');
+            throw new Exception('Vehículo no encontrado.', 404);
 
         echo json_encode(['ok' => true]);
 
     } else {
-        http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']);
+        throw new Exception('Método no permitido.', 405);
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

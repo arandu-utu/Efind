@@ -9,6 +9,7 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
 
 try {
     $db = db_connect();
@@ -33,10 +34,11 @@ try {
     $para = (int)($body['para_usuario_id'] ?? 0);
     $tx   = (int)($body['transaccion_id'] ?? 0);
     $pts  = (int)($body['puntos'] ?? 0);
-    $com  = trim($body['comentario'] ?? '');
+    $com  = campo_texto($body['comentario'] ?? null);
 
-    if (!$tx)                   throw new Exception('Falta la transacción que se califica.');
-    if ($pts < 1 || $pts > 5)   throw new Exception('La puntuación debe estar entre 1 y 5.');
+    if (!$tx)                   throw new Exception('Falta la transacción que se califica.', 400);
+    if ($pts < 1 || $pts > 5)   throw new Exception('La puntuación debe estar entre 1 y 5.', 422);
+    if (mb_strlen($com) > 500)  throw new Exception('El comentario no puede superar los 500 caracteres.', 422);
 
     /* Una calificación sólo es válida si respalda una carga real del usuario.
        Sin esta verificación, el cliente podía enviar cualquier destinatario y
@@ -46,11 +48,11 @@ try {
     $stmt->execute([':id' => $tx, ':uid' => $u['id']]);
     $t = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$t)                                throw new Exception('La transacción no existe o no te pertenece.');
-    if ((int)$t['calificado'] === 1)        throw new Exception('Esa carga ya fue calificada.');
-    if ($t['propietario_id'] === null)      throw new Exception('Esa carga no tiene un propietario a calificar.');
-    if ($para !== (int)$t['propietario_id']) throw new Exception('El destinatario no corresponde a esa transacción.');
-    if ($para === (int)$u['id'])            throw new Exception('No podés calificarte a vos mismo.');
+    if (!$t)                                throw new Exception('La transacción no existe o no te pertenece.', 404);
+    if ((int)$t['calificado'] === 1)        throw new Exception('Esa carga ya fue calificada.', 409);
+    if ($t['propietario_id'] === null)      throw new Exception('Esa carga no tiene un propietario a calificar.', 409);
+    if ($para !== (int)$t['propietario_id']) throw new Exception('El destinatario no corresponde a esa transacción.', 422);
+    if ($para === (int)$u['id'])            throw new Exception('No podés calificarte a vos mismo.', 422);
 
     /* Dos escrituras que deben ir juntas: si se registra la calificación pero
        la transacción no queda marcada, se podría calificar otra vez. */
@@ -66,6 +68,5 @@ try {
 
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

@@ -6,10 +6,11 @@
  */
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
+require_once '../includes/errores.php';
 
 try {
     $db    = db_connect();
-    $limit = isset($_GET['limit']) ? min(max((int)$_GET['limit'], 1), 1000) : 500;
+    $limit = is_scalar($_GET['limit'] ?? null) ? min(max((int)$_GET['limit'], 1), 1000) : 500;
 
     /* LIMIT se aplica sobre estaciones distintas (subquery), no sobre las
        filas planas estación×conector del join de abajo — si se aplicara
@@ -71,6 +72,5 @@ try {
     echo json_encode(['ok' => true, 'data' => array_values($estaciones)]);
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

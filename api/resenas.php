@@ -10,6 +10,8 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
+require_once '../includes/limite.php';
 
 try {
     $db = db_connect();
@@ -21,11 +23,15 @@ try {
     if ($method === 'GET') {
         if (isset($_GET['punto_carga_id'])) {
             $pcid = (int)$_GET['punto_carga_id'];
+            /* Enteros acotados: MariaDB no admite placeholders en LIMIT. */
+            $limit  = min(max((int)($_GET['limit'] ?? 100), 1), 100);
+            $offset = min(max((int)($_GET['offset'] ?? 0), 0), 100000);
             $stmt = $db->prepare("
                 SELECT id, usuario_nombre, estrellas, texto, fecha_creacion
                 FROM   resenas
                 WHERE  punto_carga_id = :pcid AND estado = 'aprobada'
                 ORDER  BY fecha_creacion DESC
+                LIMIT  $limit OFFSET $offset
             ");
             $stmt->execute([':pcid' => $pcid]);
             echo json_encode(['ok' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -35,7 +41,7 @@ try {
         requiere_rol(ROLES_MODERACION);
 
         $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
-        $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
+        $pagina    = min(max((int)($_GET['pagina'] ?? 1), 1), 100000);
         $offset    = ($pagina - 1) * $porPagina;
 
         $total = (int)$db->query("
@@ -71,19 +77,23 @@ try {
 
         $punto_carga_id = (int)($body['punto_carga_id'] ?? 0);
         $estrellas      = (int)($body['estrellas'] ?? 0);
-        $texto          = trim($body['texto'] ?? '');
+        $texto          = campo_texto($body['texto'] ?? null);
 
         if (!$punto_carga_id || $estrellas < 1 || $estrellas > 5)
             throw new Exception('Datos inválidos: falta punto_carga_id o estrellas.');
+
+        if (mb_strlen($texto) > 1000)
+            throw new Exception('El texto admite hasta 1000 caracteres.', 422);
 
         /* Sin esta comprobación se podían crear reseñas de cargadores que no
            existen, que después aparecen en la cola de moderación sin nada
            que moderar. */
         $stmt = $db->prepare("SELECT id FROM puntos_carga WHERE id = :id AND activo = 1");
         $stmt->execute([':id' => $punto_carga_id]);
-        if (!$stmt->fetch()) throw new Exception('El punto de carga no existe o no está disponible.');
+        if (!$stmt->fetch()) throw new Exception('El punto de carga no existe o no está disponible.', 404);
 
         $u = usuario_actual();
+        limitar($db, 'resena:u' . $u['id'], 5, 3600);
         $stmt = $db->prepare("
             INSERT INTO resenas (punto_carga_id, usuario_id, usuario_nombre, estrellas, texto, fecha_creacion)
             VALUES (:pcid, :uid, :nombre, :est, :txt, :fecha)
@@ -103,7 +113,7 @@ try {
         requiere_rol(ROLES_MODERACION);
         $body   = json_decode(file_get_contents('php://input'), true) ?? [];
         $id     = (int)($body['id'] ?? 0);
-        $estado = $body['estado'] ?? '';
+        $estado = $body['estado'] ?? null;
 
         if (!$id || !in_array($estado, ['aprobada', 'rechazada'], true))
             throw new Exception('Datos inválidos: id y estado requeridos.');
@@ -117,6 +127,5 @@ try {
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

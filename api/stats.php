@@ -8,6 +8,7 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
 
 requiere_rol(ROL_ADMIN);
 
@@ -59,6 +60,5 @@ try {
     ]]);
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

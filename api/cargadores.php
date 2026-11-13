@@ -14,6 +14,8 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
+require_once '../includes/limite.php';
 
 try {
     $db     = db_connect();
@@ -26,12 +28,12 @@ try {
 
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $id   = (int)($body['id'] ?? 0);
-        if (!$id) throw new Exception('Falta el id del punto de carga.');
+        if (!$id) throw new Exception('Falta el id del punto de carga.', 400);
 
         $stmt = $db->prepare("SELECT nombre FROM puntos_carga WHERE id = :id AND activo = 1");
         $stmt->execute([':id' => $id]);
         $pc = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$pc) throw new Exception('El punto de carga no existe o ya estaba oculto.');
+        if (!$pc) throw new Exception('El punto de carga no existe o ya estaba oculto.', 404);
 
         $db->prepare("UPDATE puntos_carga SET activo = 0 WHERE id = :id")->execute([':id' => $id]);
         echo json_encode(['ok' => true, 'data' => ['nombre' => $pc['nombre']]]);
@@ -45,12 +47,12 @@ try {
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
-    $nombre       = trim($body['nombre'] ?? '');
-    $direccion    = trim($body['direccion'] ?? '');
-    $ciudad       = trim($body['ciudad'] ?? '') ?: null;
-    $departamento = trim($body['departamento'] ?? '') ?: null;
-    $descripcion  = trim($body['descripcion'] ?? '') ?: null;
-    $horario      = trim($body['horario'] ?? '') ?: null;
+    $nombre       = campo_texto($body['nombre'] ?? null);
+    $direccion    = campo_texto($body['direccion'] ?? null);
+    $ciudad       = campo_texto($body['ciudad'] ?? null) ?: null;
+    $departamento = campo_texto($body['departamento'] ?? null) ?: null;
+    $descripcion  = campo_texto($body['descripcion'] ?? null) ?: null;
+    $horario      = campo_texto($body['horario'] ?? null) ?: null;
     $costo_kwh    = $body['costo_kwh'] ?? 0;
     $lat          = $body['lat'] ?? null;
     $lng          = $body['lng'] ?? null;
@@ -58,30 +60,34 @@ try {
     $conectores   = $body['conectores'] ?? [];
 
     if ($nombre === '' || $direccion === '' || $lat === null || $lng === null)
-        throw new Exception('Faltan datos obligatorios: nombre, dirección y ubicación.');
+        throw new Exception('Faltan datos obligatorios: nombre, dirección y ubicación.', 400);
+
+    if (mb_strlen($nombre) > 120 || mb_strlen($direccion) > 200 || mb_strlen($ciudad ?? '') > 80 || mb_strlen($departamento ?? '') > 50
+        || mb_strlen($horario ?? '') > 60 || mb_strlen($descripcion ?? '') > 1000)
+        throw new Exception('Algún campo supera su longitud máxima (nombre 120, dirección 200, ciudad 80, departamento 50, horario 60, descripción 1000).', 422);
 
     if (!in_array($acceso, ['publico', 'privado'], true))
-        throw new Exception('Acceso inválido: debe ser "publico" o "privado".');
+        throw new Exception('Acceso inválido: debe ser "publico" o "privado".', 422);
 
     /* El formulario ya acota estos valores, pero eso es sólo comodidad de uso:
        un cliente puede enviar cualquier cosa. Un precio negativo, por ejemplo,
        produciría transacciones con monto y comisión negativos. */
     if (!is_numeric($costo_kwh) || !is_finite((float)$costo_kwh))
-        throw new Exception('El precio por kWh debe ser un número.');
+        throw new Exception('El precio por kWh debe ser un número.', 422);
     $costo_kwh = round((float)$costo_kwh, 2);
-    if ($costo_kwh < 0)
-        throw new Exception('El precio por kWh no puede ser negativo.');
+    if ($costo_kwh < 0 || $costo_kwh > 9999.99)
+        throw new Exception('El precio por kWh debe estar entre 0 y 9999.99.', 422);
     /* Cero es válido y significa cargador gratuito. */
 
     if (!is_numeric($lat) || !is_numeric($lng) || !is_finite((float)$lat) || !is_finite((float)$lng))
-        throw new Exception('Las coordenadas deben ser numéricas.');
+        throw new Exception('Las coordenadas deben ser numéricas.', 422);
     $lat = (float)$lat;
     $lng = (float)$lng;
-    if ($lat < -90 || $lat > 90)     throw new Exception('Latitud fuera de rango: debe estar entre -90 y 90.');
-    if ($lng < -180 || $lng > 180)   throw new Exception('Longitud fuera de rango: debe estar entre -180 y 180.');
+    if ($lat < -90 || $lat > 90)     throw new Exception('Latitud fuera de rango: debe estar entre -90 y 90.', 422);
+    if ($lng < -180 || $lng > 180)   throw new Exception('Longitud fuera de rango: debe estar entre -180 y 180.', 422);
 
     if (!is_array($conectores) || count($conectores) === 0)
-        throw new Exception('Debés agregar al menos un conector.');
+        throw new Exception('Debés agregar al menos un conector.', 400);
 
     /* Resolver nombre de conector -> tipo_conector_id */
     $tiposStmt = $db->query("SELECT id, nombre FROM tipos_conector");
@@ -92,19 +98,20 @@ try {
 
     $conectoresResueltos = [];
     foreach ($conectores as $c) {
-        $tipoNombre = trim($c['tipo'] ?? '');
+        if (!is_array($c)) throw new Exception('Conector inválido.', 400);
+        $tipoNombre = campo_texto($c['tipo'] ?? null);
         if (!isset($tiposMap[$tipoNombre]))
-            throw new Exception("Tipo de conector desconocido: \"$tipoNombre\".");
+            throw new Exception("Tipo de conector desconocido: \"$tipoNombre\".", 422);
 
         /* Se exige que sea positiva y que entre en la columna, que es
            DECIMAL(6,2). No se impone el tope de 350 kW del formulario porque
            no está definido como regla del proyecto en la documentación. */
         $potencia = $c['potencia'] ?? null;
         if (!is_numeric($potencia) || !is_finite((float)$potencia))
-            throw new Exception("La potencia del conector \"$tipoNombre\" debe ser un número.");
+            throw new Exception("La potencia del conector \"$tipoNombre\" debe ser un número.", 422);
         $potencia = round((float)$potencia, 2);
         if ($potencia <= 0 || $potencia >= 10000)
-            throw new Exception("Potencia inválida para el conector \"$tipoNombre\".");
+            throw new Exception("Potencia inválida para el conector \"$tipoNombre\".", 422);
 
         $conectoresResueltos[] = [
             'tipo_conector_id' => $tiposMap[$tipoNombre],
@@ -112,6 +119,7 @@ try {
         ];
     }
 
+    limitar($db, 'cargador:u' . $u['id'], 5, 86400);
     $db->beginTransaction();
 
     $stmt = $db->prepare("
@@ -156,6 +164,5 @@ try {
 
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

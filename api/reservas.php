@@ -9,6 +9,7 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
 
 try {
     $db = db_connect();
@@ -30,16 +31,19 @@ try {
     } elseif ($_SERVER['REQUEST_METHOD'] === 'PATCH') {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $id   = (int)($body['id'] ?? 0);
-        if (!$id) throw new Exception('Falta el id.');
+        if (!$id) throw new Exception('Falta el id.', 400);
+        /* rowCount() da 0 si ya estaba marcada, así que la existencia se comprueba aparte. */
+        $stmt = $db->prepare("SELECT id FROM transacciones WHERE id = :id AND usuario_id = :uid");
+        $stmt->execute([':id' => $id, ':uid' => $u['id']]);
+        if (!$stmt->fetch()) throw new Exception('La transacción no existe o no te pertenece.', 404);
         $db->prepare("UPDATE transacciones SET calificado = 1 WHERE id = :id AND usuario_id = :uid")
            ->execute([':id' => $id, ':uid' => $u['id']]);
         echo json_encode(['ok' => true]);
 
     } else {
-        http_response_code(405); echo json_encode(['ok' => false, 'error' => 'Método no permitido.']);
+        throw new Exception('Método no permitido.', 405);
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

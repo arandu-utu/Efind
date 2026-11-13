@@ -15,6 +15,7 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
 
 const UTE_API_URL = 'https://movilidad.ute.com.uy/api/v1/station/status/map';
 
@@ -79,6 +80,7 @@ try {
     $creados = 0;
     $actualizados = 0;
     $omitidos = 0;
+    $conectoresOmitidos = 0;
 
     /* La API de UTE no publica horario ni precio por estación. La red
        CargaME es gratuita y de acceso 24hs (están en estaciones ANCAP);
@@ -121,8 +123,13 @@ try {
     $db->beginTransaction();
 
     foreach ($json['data'] as $raw) {
-        $nombre = trim($raw['name'] ?? '');
-        if ($nombre === '' || !isset($raw['lat'], $raw['lng'])) { $omitidos++; continue; }
+        $nombre = campo_texto($raw['name'] ?? null);
+        /* Un dato roto de la fuente (sin nombre, coordenada ausente o fuera de rango) se omite: no debe tumbar toda la sincronización. */
+        if ($nombre === '' || !is_numeric($raw['lat'] ?? null) || !is_numeric($raw['lng'] ?? null) || abs($raw['lat']) > 90 || abs($raw['lng']) > 180) { $omitidos++; continue; }
+        $nombre = mb_substr($nombre, 0, 120);
+        $direccion = mb_substr(campo_texto($raw['address'] ?? null), 0, 200);
+        $ciudad = mb_substr(campo_texto($raw['city'] ?? null), 0, 80) ?: null;
+        $departamento = mb_substr(campo_texto($raw['department'] ?? null), 0, 50) ?: null;
 
         $conectoresRaw = $raw['connectorStatusAcc'] ?? [];
         $estado = calcularEstadoEstacion($conectoresRaw);
@@ -131,9 +138,9 @@ try {
 
         if ($puntoCargaId !== null) {
             $stmtUpdate->execute([
-                ':direccion'    => $raw['address'] ?? '',
-                ':ciudad'       => $raw['city'] ?? null,
-                ':departamento' => $raw['department'] ?? null,
+                ':direccion'    => $direccion,
+                ':ciudad'       => $ciudad,
+                ':departamento' => $departamento,
                 ':lat'          => $raw['lat'],
                 ':lng'          => $raw['lng'],
                 ':id'           => $puntoCargaId,
@@ -143,9 +150,9 @@ try {
         } else {
             $stmtInsert->execute([
                 ':nombre'       => $nombre,
-                ':direccion'    => $raw['address'] ?? '',
-                ':ciudad'       => $raw['city'] ?? null,
-                ':departamento' => $raw['department'] ?? null,
+                ':direccion'    => $direccion,
+                ':ciudad'       => $ciudad,
+                ':departamento' => $departamento,
                 ':lat'          => $raw['lat'],
                 ':lng'          => $raw['lng'],
                 ':estado'       => $estado,
@@ -158,6 +165,8 @@ try {
             $tipoUte = $con['type'] ?? '';
             $tipoNombre = TIPO_MAP[$tipoUte] ?? null;
             if ($tipoNombre === null || !isset($tiposMap[$tipoNombre])) continue; // tipo desconocido, se ignora
+            /* Una potencia nula o negativa es un dato roto de la fuente: no se guarda. */
+            if ((float)($con['power'] ?? 0) <= 0 || (float)$con['power'] >= 10000) { $conectoresOmitidos++; continue; }
             $cantidad = max(1, (int)($con['count'] ?? 1));
             $estadoConector = normalizarEstado($con['statusDetail'] ?? '');
             for ($i = 0; $i < $cantidad; $i++) {
@@ -177,11 +186,11 @@ try {
         'creados'      => $creados,
         'actualizados' => $actualizados,
         'omitidos'     => $omitidos,
+        'conectores_omitidos' => $conectoresOmitidos,
         'total_ute'    => count($json['data']),
     ]]);
 
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

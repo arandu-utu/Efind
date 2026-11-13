@@ -11,6 +11,7 @@ require_once '../includes/sesion.php';
 iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
+require_once '../includes/errores.php';
 
 /** Devuelve la fila del token si sigue siendo utilizable, o null. */
 function token_valido(PDO $db, string $token): ?array {
@@ -26,7 +27,7 @@ try {
     $metodo = $_SERVER['REQUEST_METHOD'];
 
     if ($metodo === 'GET') {
-        $valido = token_valido($db, $_GET['token'] ?? '') !== null;
+        $valido = token_valido($db, campo_texto($_GET['token'] ?? null)) !== null;
         echo json_encode(['ok' => true, 'data' => ['valido' => $valido]]);
         exit;
     }
@@ -38,12 +39,12 @@ try {
     }
 
     $body     = json_decode(file_get_contents('php://input'), true) ?? [];
-    $token    = trim($body['token'] ?? '');
-    $password = $body['password'] ?? '';
+    $token    = campo_texto($body['token'] ?? null);
+    $password = is_string($body['password'] ?? null) ? $body['password'] : '';
 
-    if (strlen($password) < 8) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'La contraseña debe tener al menos 8 caracteres.']);
+    if (strlen($password) < 8 || strlen($password) > 72) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'La contraseña debe tener entre 8 y 72 bytes (las tildes y los símbolos ocupan 2 o más).']);
         exit;
     }
 
@@ -85,6 +86,5 @@ try {
 
 } catch (Throwable $e) {
     if (isset($db) && $db->inTransaction()) $db->rollBack();
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

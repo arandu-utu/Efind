@@ -10,6 +10,8 @@ iniciar_sesion_segura();
 header('Content-Type: application/json; charset=utf-8');
 require_once '../includes/db.php';
 require_once '../includes/auth.php';
+require_once '../includes/errores.php';
+require_once '../includes/limite.php';
 
 try {
     $db     = db_connect();
@@ -20,7 +22,7 @@ try {
         requiere_rol(ROLES_MODERACION);
 
         $porPagina = min(max((int)($_GET['por_pagina'] ?? 20), 5), 100);
-        $pagina    = max((int)($_GET['pagina'] ?? 1), 1);
+        $pagina    = min(max((int)($_GET['pagina'] ?? 1), 1), 100000);
         $offset    = ($pagina - 1) * $porPagina;
 
         $total = (int)$db->query("SELECT COUNT(*) FROM reportes WHERE resuelto = 0")->fetchColumn();
@@ -55,8 +57,8 @@ try {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
         $punto_carga_id = (int)($body['punto_carga_id'] ?? 0);
-        $tipo           = trim($body['tipo'] ?? '');
-        $descripcion    = trim($body['descripcion'] ?? '');
+        $tipo           = campo_texto($body['tipo'] ?? null);
+        $descripcion    = campo_texto($body['descripcion'] ?? null);
 
         if (!$punto_carga_id || !$tipo)
             throw new Exception('Faltan campos requeridos: punto_carga_id y tipo.');
@@ -77,11 +79,14 @@ try {
            haría que la validación dependiera del sql_mode del servidor: con
            STRICT_TRANS_TABLES la base rechaza el valor, pero sin ese modo lo
            trunca en silencio y queda un reporte con el tipo vacío. */
+        if (mb_strlen($descripcion) > 1000)
+            throw new Exception('La descripción admite hasta 1000 caracteres.', 422);
+
         if (!$tiposValidos)
             throw new Exception('No se pudo leer el catálogo de tipos de reporte.');
 
         if (!in_array($tipo, $tiposValidos, true))
-            throw new Exception('Tipo de reporte inválido. Opciones: ' . implode(', ', $tiposValidos) . '.');
+            throw new Exception('Tipo de reporte inválido. Opciones: ' . implode(', ', $tiposValidos) . '.', 422);
 
         /* El panel de administración ya contempla reportes huérfanos, porque un
            cargador puede desaparecer después. Lo que no debería poder pasar es
@@ -91,6 +96,7 @@ try {
         if (!$stmt->fetch()) throw new Exception('El punto de carga no existe o no está disponible.');
 
         $u = usuario_actual();
+        limitar($db, 'reporte:u' . $u['id'], 10, 3600);
         $stmt = $db->prepare("
             INSERT INTO reportes (punto_carga_id, usuario_id, tipo, descripcion)
             VALUES (:pcid, :uid, :tipo, :desc)
@@ -122,6 +128,5 @@ try {
     }
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    responder_error($e);
 }

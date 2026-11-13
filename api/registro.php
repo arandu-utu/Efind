@@ -8,6 +8,8 @@
  */
 require_once '../includes/db.php';
 require_once '../includes/sesion.php';
+require_once '../includes/errores.php';
+require_once '../includes/limite.php';
 iniciar_sesion_segura();
 header('Content-Type: application/json');
 
@@ -28,13 +30,6 @@ function validar_ci($ci) {
 
 function validar_rut($rut) {
     return (bool)preg_match('/^\d{12}$/', normalizar_documento($rut));
-}
-
-/* El cuerpo es JSON del cliente: cualquier campo puede llegar como array o
-   como número. trim() sobre un array lanza TypeError, que no es Exception y
-   tumbaría el script después de haber mandado ya la cabecera JSON. */
-function campo_texto($valor): string {
-    return is_string($valor) ? trim($valor) : '';
 }
 
 $body     = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -60,8 +55,14 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     echo json_encode(['ok' => false, 'error' => 'Email inválido']);
     exit;
 }
-if (strlen($password) < 8) {
-    echo json_encode(['ok' => false, 'error' => 'La contraseña debe tener al menos 8 caracteres']);
+if (strlen($password) < 8 || strlen($password) > 72) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'error' => 'La contraseña debe tener entre 8 y 72 bytes (las tildes y los símbolos ocupan 2 o más)']);
+    exit;
+}
+if (mb_strlen($nombre) > 80 || mb_strlen($empresa) > 150) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'error' => 'El nombre admite hasta 80 caracteres y la empresa hasta 150']);
     exit;
 }
 if ($rol === 'empresa') {
@@ -83,57 +84,69 @@ if ($rol === 'empresa') {
     $empresa = null;
 }
 
-$pdo = db_connect();
+try {
+    $pdo = db_connect();
 
-// Verificar email duplicado
-$stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
-$stmt->execute([$email]);
-if ($stmt->fetch()) {
-    echo json_encode(['ok' => false, 'error' => 'El email ya está registrado']);
-    exit;
+    // Verificar email duplicado
+    $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE email = ?");
+    $stmt->execute([$email]);
+    if ($stmt->fetch()) {
+        echo json_encode(['ok' => false, 'error' => 'El email ya está registrado']);
+        exit;
+    }
+
+    /* Verificar documento duplicado. Lo exige el criterio de aceptación de la
+       historia HU-07: una cédula no puede corresponder a dos cuentas. Se compara
+       sobre el valor ya normalizado, que es el formato en que se almacena.
+       Esta comprobación es la que da el mensaje claro al usuario; la garantía
+       definitiva es el índice UNIQUE sobre ci_rut, porque entre este SELECT y el
+       INSERT dos peticiones simultáneas podrían pasar las dos. */
+    $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE ci_rut = ?");
+    $stmt->execute([$ciNormalizado]);
+    if ($stmt->fetch()) {
+        echo json_encode(['ok' => false, 'error' => $rol === 'empresa'
+            ? 'Ese RUT ya está registrado'
+            : 'Esa cédula ya está registrada']);
+        exit;
+    }
+
+    $rolId = $rol === 'empresa' ? 3 : 2;
+
+    limitar($pdo, 'registro:ip:' . ip_cliente(), 10, 3600);
+
+    // Crear usuario con bcrypt cost 12
+    $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+    $stmt = $pdo->prepare(
+        "INSERT INTO usuarios (nombre, email, password_hash, ci_rut, empresa, rol_id, activo, terminos_aceptados_en)
+         VALUES (?, ?, ?, ?, ?, ?, 1, NOW())"
+    );
+    try {
+        $stmt->execute([$nombre, $email, $hash, $ciNormalizado, $empresa, $rolId]);
+    } catch (PDOException $e) {
+        /* Dos altas simultáneas pasaron los SELECT de arriba: gana el índice UNIQUE. */
+        if (($e->errorInfo[0] ?? '') === '23000') throw new Exception('El email o el documento ya están registrados', 409);
+        throw $e;
+    }
+    $nuevo_id = $pdo->lastInsertId();
+
+    // Iniciar sesión automáticamente, con identificador nuevo
+    renovar_sesion();
+    $_SESSION['usuario_id'] = $nuevo_id;
+    $_SESSION['nombre']     = $nombre;
+    $_SESSION['rol_id']     = $rolId;
+
+    // Devolver datos para localStorage (navbar)
+    echo json_encode([
+        'ok'   => true,
+        'data' => [
+            'id'      => (int)$nuevo_id,
+            'nombre'  => $nombre,
+            'email'   => $email,
+            'ci_rut'  => $ciNormalizado,
+            'empresa' => $empresa,
+            'rol_id'  => $rolId,
+        ],
+    ]);
+} catch (Throwable $e) {
+    responder_error($e);
 }
-
-/* Verificar documento duplicado. Lo exige el criterio de aceptación de la
-   historia HU-07: una cédula no puede corresponder a dos cuentas. Se compara
-   sobre el valor ya normalizado, que es el formato en que se almacena.
-   Esta comprobación es la que da el mensaje claro al usuario; la garantía
-   definitiva es el índice UNIQUE sobre ci_rut, porque entre este SELECT y el
-   INSERT dos peticiones simultáneas podrían pasar las dos. */
-$stmt = $pdo->prepare("SELECT id FROM usuarios WHERE ci_rut = ?");
-$stmt->execute([$ciNormalizado]);
-if ($stmt->fetch()) {
-    echo json_encode(['ok' => false, 'error' => $rol === 'empresa'
-        ? 'Ese RUT ya está registrado'
-        : 'Esa cédula ya está registrada']);
-    exit;
-}
-
-$rolId = $rol === 'empresa' ? 3 : 2;
-
-// Crear usuario con bcrypt cost 12
-$hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-$stmt = $pdo->prepare(
-    "INSERT INTO usuarios (nombre, email, password_hash, ci_rut, empresa, rol_id, activo, terminos_aceptados_en)
-     VALUES (?, ?, ?, ?, ?, ?, 1, NOW())"
-);
-$stmt->execute([$nombre, $email, $hash, $ciNormalizado, $empresa, $rolId]);
-$nuevo_id = $pdo->lastInsertId();
-
-// Iniciar sesión automáticamente, con identificador nuevo
-renovar_sesion();
-$_SESSION['usuario_id'] = $nuevo_id;
-$_SESSION['nombre']     = $nombre;
-$_SESSION['rol_id']     = $rolId;
-
-// Devolver datos para localStorage (navbar)
-echo json_encode([
-    'ok'   => true,
-    'data' => [
-        'id'      => (int)$nuevo_id,
-        'nombre'  => $nombre,
-        'email'   => $email,
-        'ci_rut'  => $ciNormalizado,
-        'empresa' => $empresa,
-        'rol_id'  => $rolId,
-    ],
-]);

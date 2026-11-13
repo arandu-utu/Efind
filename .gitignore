@@ -23,3 +23,5 @@ cloudflared-tmp/
 
 # El manejo de sesión tampoco tiene secretos
 !includes/sesion.php
+!includes/errores.php
+!includes/limite.php
