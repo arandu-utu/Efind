@@ -157,11 +157,43 @@ Idempotente. Va **antes** de desplegar el código: `registro.php` ya escribe la
 columna. Las cuentas anteriores quedan con `NULL`, que es lo que corresponde:
 no aceptaron nada todavía.
 
+## 007 — Límites de uso, rangos válidos e índices
+
+Agrega la tabla `limites_uso` que usa `includes/limite.php` (sin ella el límite
+no bloquea a nadie), la columna `transacciones.creado_en` con un índice para
+detectar cobros repetidos, restricciones `CHECK` de rango (puntos y estrellas
+de 1 a 5, coordenadas válidas, costos, potencias y montos no negativos,
+comisión no mayor al monto), `resenas.estado` obligatorio e índices para las
+consultas de `api/`.
+
+```bash
+mysql -u root -p efind < db/migraciones/007_endurecimiento_y_limites.sql
+```
+
+Idempotente. Antes de crear los `CHECK` lista las filas que los violarían: si
+esa consulta devuelve filas, el `ALTER` falla sin escribir nada y hay que
+revisar esos datos, no forzar la restricción. Sólo corrige por su cuenta lo
+seguro: reseñas sin estado pasan a `pendiente` y potencias de 0 o negativas
+pasan a `NULL`. Las transacciones anteriores quedan con la hora de la
+migración en `creado_en`. Requiere MariaDB 10.4 o superior. Va **antes** de
+desplegar el código.
+
+## Procedimiento aparte: supresión de un usuario
+
+`db/procedimientos/anonimizar_usuario.sql` atiende el derecho de supresión de
+la Ley 18.331. No es una migración y no se corre por orden: se ejecuta caso por
+caso con `SET @uid = <id>`. Los comentarios del archivo indican qué datos se
+eliminan y cuáles se conservan.
+
 ## Orden de aplicación
 
-Sobre una base existente: 001, 002, 003, 004, 005, 006. La 001, la 002, la
-003, la 005 y la 006 van **antes** de desplegar el código que las acompaña; la
-004 puede ir después.
+Sobre una base existente: 001, 002, 003, 004, 005, 006, 007. La 001, la 002, la
+003, la 005, la 006 y la 007 van **antes** de desplegar el código que las
+acompaña; la 004 puede ir después.
+
+**La 004 fija identificadores de producción y sólo debe correrse allí.** En
+cualquier otra base (desarrollo, pruebas, una instalación nueva) retiraría
+cargadores que no son de prueba. Se omite fuera de producción.
 
 Una instalación nueva desde `db/schema.sql` ya incluye todo lo estructural de
-001, 003 y 006, así que sólo necesita el esquema y la semilla.
+001, 003, 006 y 007, así que sólo necesita el esquema y la semilla.

@@ -2,7 +2,7 @@
 --  E-Find — Esquema de Base de Datos
 --  Motor: MariaDB (XAMPP)
 --  Proyecto de Egreso 2026 - Equipo Arandu
---  Rev. 1.1 — 2026-08-11
+--  Rev. 1.2 — incluye hasta la migración 007
 -- =====================================================
 
 -- Este archivo NO crea ni selecciona la base de datos: la indica quien lo
@@ -22,7 +22,7 @@
 CREATE TABLE roles (
   id     TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(30) NOT NULL UNIQUE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -42,7 +42,7 @@ CREATE TABLE usuarios (
   actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_ci_rut (ci_rut),
   FOREIGN KEY (rol_id) REFERENCES roles(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -52,7 +52,7 @@ CREATE TABLE tipos_conector (
   id           TINYINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nombre       VARCHAR(40) NOT NULL UNIQUE,
   carga_rapida TINYINT(1) NOT NULL DEFAULT 0
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -69,8 +69,9 @@ CREATE TABLE vehiculos (
   tipo_conector_id      TINYINT UNSIGNED,
   activo                TINYINT(1) NOT NULL DEFAULT 1,
   FOREIGN KEY (usuario_id)       REFERENCES usuarios(id)       ON DELETE CASCADE,
-  FOREIGN KEY (tipo_conector_id) REFERENCES tipos_conector(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
+  FOREIGN KEY (tipo_conector_id) REFERENCES tipos_conector(id) ON DELETE SET NULL,
+  INDEX idx_veh_usuario_activo (usuario_id, activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -99,10 +100,15 @@ CREATE TABLE puntos_carga (
   creado_en      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (propietario_id) REFERENCES usuarios(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX idx_pc_geo    ON puntos_carga (lat, lng);
 CREATE INDEX idx_pc_estado ON puntos_carga (estado, activo);
+CREATE INDEX idx_pc_fuente_nombre ON puntos_carga (fuente, nombre);
+ALTER TABLE puntos_carga
+  ADD CONSTRAINT ck_pc_lat   CHECK (lat BETWEEN -90 AND 90),
+  ADD CONSTRAINT ck_pc_lng   CHECK (lng BETWEEN -180 AND 180),
+  ADD CONSTRAINT ck_pc_costo CHECK (costo_kwh >= 0);
 
 
 -- -----------------------------------------------------
@@ -115,12 +121,14 @@ CREATE TABLE conectores (
   potencia_kw      DECIMAL(6,2),
   estado           ENUM('disponible','ocupado','sin_servicio') NOT NULL DEFAULT 'disponible',
   FOREIGN KEY (punto_carga_id)   REFERENCES puntos_carga(id)   ON DELETE CASCADE,
-  FOREIGN KEY (tipo_conector_id) REFERENCES tipos_conector(id)
-) ENGINE=InnoDB;
+  FOREIGN KEY (tipo_conector_id) REFERENCES tipos_conector(id),
+  CONSTRAINT ck_conectores_potencia CHECK (potencia_kw IS NULL OR potencia_kw > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
 -- RESERVAS
+-- Tabla heredada: la aplicacion no la usa (las cargas se registran en transacciones).
 -- -----------------------------------------------------
 CREATE TABLE reservas (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -135,11 +143,12 @@ CREATE TABLE reservas (
   FOREIGN KEY (usuario_id)  REFERENCES usuarios(id),
   FOREIGN KEY (conector_id) REFERENCES conectores(id),
   FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
 -- PAGOS (simulados)
+-- Tabla heredada: la aplicacion no la usa (el cobro queda en transacciones).
 -- comision_efind = 10% del monto_total
 -- monto_propietario = 90% del monto_total
 -- El calculo lo hace el PHP antes de insertar
@@ -155,7 +164,7 @@ CREATE TABLE pagos (
   procesado_en      TIMESTAMP NULL,
   creado_en         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (reserva_id) REFERENCES reservas(id)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -172,8 +181,9 @@ CREATE TABLE reportes (
   creado_en      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE CASCADE,
   FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE SET NULL,
-  FOREIGN KEY (resuelto_por)   REFERENCES usuarios(id)     ON DELETE SET NULL
-) ENGINE=InnoDB;
+  FOREIGN KEY (resuelto_por)   REFERENCES usuarios(id)     ON DELETE SET NULL,
+  INDEX idx_reportes_resuelto (resuelto, creado_en)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -186,7 +196,7 @@ CREATE TABLE favoritos (
   PRIMARY KEY (usuario_id, punto_carga_id),
   FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE CASCADE,
   FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -206,11 +216,16 @@ CREATE TABLE transacciones (
   comision       DECIMAL(10,2) NOT NULL DEFAULT 0,
   calificado     TINYINT(1)    NOT NULL DEFAULT 0,
   fecha          DATE          NOT NULL,
+  creado_en      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- instante del cobro; `fecha` solo guarda el dia
   UNIQUE KEY uq_recibo (recibo),
+  INDEX idx_tx_cobro_repetido (usuario_id, punto_carga_id, creado_en),
+  CONSTRAINT ck_tx_kwh      CHECK (kwh >= 0),
+  CONSTRAINT ck_tx_monto    CHECK (monto_total >= 0),
+  CONSTRAINT ck_tx_comision CHECK (comision >= 0 AND comision <= monto_total),
   CONSTRAINT fk_transacciones_usuario     FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE RESTRICT,
   CONSTRAINT fk_transacciones_punto_carga FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE RESTRICT,
   CONSTRAINT fk_transacciones_propietario FOREIGN KEY (propietario_id) REFERENCES usuarios(id)     ON DELETE SET NULL
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -228,10 +243,11 @@ CREATE TABLE calificaciones (
   tipo            VARCHAR(30)  NOT NULL,
   fecha           DATE         NOT NULL,
   UNIQUE KEY uq_transaccion (transaccion_id),
+  CONSTRAINT ck_calificaciones_puntos CHECK (puntos BETWEEN 1 AND 5),
   CONSTRAINT fk_calificaciones_transaccion  FOREIGN KEY (transaccion_id)  REFERENCES transacciones(id) ON DELETE RESTRICT,
   CONSTRAINT fk_calificaciones_autor        FOREIGN KEY (de_usuario_id)   REFERENCES usuarios(id)      ON DELETE RESTRICT,
   CONSTRAINT fk_calificaciones_destinatario FOREIGN KEY (para_usuario_id) REFERENCES usuarios(id)      ON DELETE RESTRICT
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -244,11 +260,14 @@ CREATE TABLE resenas (
   usuario_nombre VARCHAR(100) NOT NULL,
   estrellas      TINYINT      NOT NULL,
   texto          TEXT,
-  estado         ENUM('pendiente','aprobada','rechazada') DEFAULT 'pendiente',
+  estado         ENUM('pendiente','aprobada','rechazada') NOT NULL DEFAULT 'pendiente',
   fecha_creacion DATE DEFAULT NULL,
+  INDEX idx_resenas_pc_estado (punto_carga_id, estado),
+  INDEX idx_resenas_estado (estado),
+  CONSTRAINT ck_resenas_estrellas CHECK (estrellas BETWEEN 1 AND 5),
   CONSTRAINT fk_resenas_punto_carga FOREIGN KEY (punto_carga_id) REFERENCES puntos_carga(id) ON DELETE RESTRICT,
   CONSTRAINT fk_resenas_usuario     FOREIGN KEY (usuario_id)     REFERENCES usuarios(id)     ON DELETE RESTRICT
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -264,8 +283,9 @@ CREATE TABLE password_resets (
   creado_en  DATETIME     NOT NULL,
   INDEX idx_token (token_hash),
   INDEX idx_usuario (usuario_id),   -- InnoDB lo reutiliza para la clave foranea
+  INDEX idx_pr_expira (expira_en),
   CONSTRAINT fk_password_resets_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -280,12 +300,26 @@ CREATE TABLE login_intentos (
   email          VARCHAR(150) NOT NULL,
   intentos       INT          NOT NULL DEFAULT 1,
   ultimo_intento DATETIME     NOT NULL,
-  UNIQUE KEY ip_email (ip, email)
-) ENGINE=InnoDB;
+  UNIQUE KEY ip_email (ip, email),
+  INDEX idx_li_ultimo_intento (ultimo_intento)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- -----------------------------------------------------
+-- LIMITES DE USO (includes/limite.php)
+-- Un renglon por evento; se cuentan los de la ventana y se purgan los viejos.
+-- -----------------------------------------------------
+CREATE TABLE limites_uso (
+  id      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  clave   VARCHAR(80) NOT NULL,
+  momento TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_clave_momento (clave, momento)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
 -- VISTA: lo que necesita el mapa por estacion
+-- Vista heredada: la aplicacion no la usa (api/estaciones.php arma su propia consulta).
 -- -----------------------------------------------------
 CREATE VIEW v_disponibilidad AS
 SELECT
@@ -311,6 +345,7 @@ GROUP BY pc.id;
 
 -- -----------------------------------------------------
 -- VISTA: historial de carga por usuario
+-- Vista heredada: la aplicacion no la usa (api/reservas.php lee transacciones).
 -- -----------------------------------------------------
 CREATE VIEW v_historial_usuario AS
 SELECT
