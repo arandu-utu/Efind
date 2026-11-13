@@ -1,12 +1,13 @@
 # Batería de pruebas de integración
 
-81 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
+217 casos que ejercitan los endpoints reales por HTTP, contra una base de datos
 real. No son pruebas unitarias con dobles: levantan el sitio, hacen peticiones
 con sesión y cookies como lo haría un navegador, y comprueban tanto la
 respuesta como el estado en que queda la base.
 
 Se usan como criterio de aceptación: cualquier cambio en `api/` o en el
-esquema tiene que dejarlas en 81 de 81 antes de desplegar.
+esquema tiene que dejarlas en 217 de 217 antes de desplegar. El recuento sale de contar
+los `caso(` de `suite.php` desarrollando los bucles; si se agregan casos, se corrige acá.
 
 ## Qué cubren
 
@@ -21,6 +22,15 @@ esquema tiene que dejarlas en 81 de 81 antes de desplegar.
 | Reseñas y reportes | 4 | Cargador existente e inexistente |
 | Ocultar del mapa (HU-05) | 10 | Permisos, efecto en la base, y que un cargador oculto no se pueda pagar, reseñar ni reportar |
 | Rol Moderador (HU-04 a HU-06) | 10 | Lo que el moderador puede hacer, y que lo reservado al administrador le responda 403 |
+| Sesión revalidada | 12 | La suspensión y el cambio de rol rigen en la petición siguiente; un suspendido no ingresa; logout solo por POST |
+| Permisos por rol | 13 | Usuario común (403) en usuarios, estadísticas, sincronización UTE y moderación; nadie se cambia el rol ni se desactiva (409) |
+| Regla de UTE | 6 | Ni las estaciones de UTE ni los cargadores públicos se pagan (403); el estado de UTE lo cambia la comunidad |
+| Estado y cola | 9 | En un cargador privado solo cambian el propietario y la moderación; en uno público, la comunidad |
+| Vehículos | 12 | Capacidad y conector inválidos, topes de longitud, baja de vehículo ajeno, máximo de 10 activos (409) |
+| Historial de reservas | 6 | Solo se ven y se marcan las transacciones propias (404 con una ajena o inexistente) |
+| Límites de uso | 8 | 429 en el registro (11.º), reseñas (6.ª), reportes (11.º) y altas de cargador (6.ª) |
+| Validación y entradas hostiles | 51 | Topes de longitud y rangos (422), contraseña de 73 bytes, arreglos donde va texto sin llegar a 500, activo estricto |
+| Paginación | 13 | Parámetros fuera de rango o con basura se corrigen, nunca dan 500 |
 
 ## Cómo se corren
 
@@ -51,6 +61,23 @@ php pruebas/suite.php
 Imprime cada caso y termina con el total. Si algo falla, lista los casos
 fallidos con el detalle de lo que devolvió el endpoint.
 
+Cada cliente de la batería envía una cabecera `CF-Connecting-IP` propia, distinta
+por instancia y por corrida. El servidor la respeta porque la conexión viene de
+`127.0.0.1`, y así los límites de uso (429) no se acumulan entre casos ni entre
+corridas. Los casos de límites usan usuarios nuevos para no gastar el cupo de los demás.
+
+### Estimador de tiempo de carga
+
+`estimador.test.js` prueba `js/estimador.js` con Node, sin dependencias y sin
+servidor ni base de datos. Sale con código distinto de cero si algún caso falla:
+
+```bash
+node pruebas/estimador.test.js
+```
+
+Los casos de referencia coinciden con los que el servidor comprueba en `pagos.php`
+(52 kWh al 20 % con 22 kW dan 2 h 3 min y 41,6 kWh).
+
 ## Configuración
 
 Los valores por defecto son los de un XAMPP recién instalado. Se cambian por
@@ -78,6 +105,9 @@ que crearlos apuntando a `efind_test`.
 
 Se deja constancia explícita para que la cobertura no se dé por mayor de lo que es.
 
+- **La sincronización con UTE.** Llama a la API externa de UTE; sin red no se puede
+  ejercitar, así que no está comprobado que la sincronización respete el estado
+  reportado por la comunidad. Sí se prueba la regla de pagos sobre estaciones de UTE.
 - **El envío real de correo.** Requiere credenciales del servidor, que no están en el
   repositorio.
 - **La interfaz.** La batería ejercita los endpoints, no el navegador. Las

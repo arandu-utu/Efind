@@ -210,6 +210,30 @@ caso('pagos', 'Sin vehiculo no se genera pago', ($r['cuerpo']['ok'] ?? true) ===
 $r = $ANON->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idCargador, 'vehiculo_id' => $idVeh, 'conector_id' => $conector, 'soc_pct' => 20]);
 caso('pagos', 'Sin sesion no se genera pago', $r['codigo'] === 401);
 
+/* Controles del servidor y códigos HTTP: un aviso al usuario no es un error 500. */
+$r = $B->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => $idVehB, 'conector_id' => $conector, 'soc_pct' => 20]);
+caso('pagos', 'El dueno no puede reservar su propio cargador (403)', $r['codigo'] === 403 && ($r['cuerpo']['ok'] ?? true) === false, "codigo={$r['codigo']}");
+
+$r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => 999999, 'conector_id' => $conector, 'soc_pct' => 20]);
+caso('pagos', 'Vehiculo inexistente responde 404, no 500', $r['codigo'] === 404, "codigo={$r['codigo']}");
+
+$r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => $idVeh, 'conector_id' => $conector, 'soc_pct' => 'abc']);
+caso('pagos', 'Estado de carga no numerico responde 400', $r['codigo'] === 400, "codigo={$r['codigo']}");
+
+$r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => $idVeh, 'conector_id' => $conector, 'soc_pct' => ['x']]);
+caso('pagos', 'Estado de carga como arreglo no provoca error 500', $r['codigo'] === 400, "codigo={$r['codigo']}");
+
+$sql->exec("UPDATE conectores SET estado = 'sin_servicio' WHERE id = $conector");
+$r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => $idVeh, 'conector_id' => $conector, 'soc_pct' => 20]);
+caso('pagos', 'Conector fuera de servicio no se cobra (409)', $r['codigo'] === 409, "codigo={$r['codigo']}");
+$sql->exec("UPDATE conectores SET estado = 'disponible' WHERE id = $conector");
+
+/* 40,4 kWh a 22 kW con rendimiento 0,92 son 119,76 minutos: el servidor dejaba
+   «1 h 60 min» al redondear solo la fraccion; tiene que dar «2 h». */
+$rv40 = $A->pedir('POST', '/api/vehiculos.php', ['marca' => 'Nissan', 'modelo' => 'Leaf', 'capacidad_kwh' => 40.4, 'tipo_conector' => 'Type 2']);
+$r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => $rv40['cuerpo']['data']['id'] ?? 0, 'conector_id' => $conector, 'soc_pct' => 0]);
+caso('pagos', 'El tiempo nunca sale como "60 min": 119,76 minutos dan 2 h', ($r['cuerpo']['data']['tiempo'] ?? '') === '2 h', 'tiempo=' . ($r['cuerpo']['data']['tiempo'] ?? '?'));
+
 /* ═══════════════════════════════ CALIFICACIONES ═══════════════════════════ */
 grupo('CALIFICACIONES: SOLO SOBRE CARGAS PROPIAS');
 
@@ -355,5 +379,387 @@ caso('moderador', 'No dispara la sincronizacion con UTE', $r['codigo'] === 403, 
 $r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'rol_id' => 4]);
 caso('moderador', 'El administrador asigna el rol Moderador', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
 $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $idA, 'rol_id' => 2]);            // se repone
+
+/* ═══════════════════ ACTUALIZACION GENERAL: BLOQUES NUEVOS ═══════════════════ */
+
+/* Cada usuario nuevo trae su propio cliente, y con él su propia IP: los límites
+   de uso de un caso no consumen el cupo de otro. El rol se fija por SQL antes
+   de ingresar, igual que con el administrador y el moderador. */
+function nuevoUsuario(string $etiqueta, int $rol = 2): array {
+    global $sql, $sufijo;
+    static $n = 0;
+    $n++;
+    $c = new Cliente("n$etiqueta$n");
+    $email = "$etiqueta{$n}_$sufijo@test.com";
+    $r = $c->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => "Usuario $etiqueta", 'email' => $email,
+        'password' => 'contrasena1', 'rol' => 'particular', 'ci' => ciValida(random_int(1000000, 9999999))]);
+    $id = $r['cuerpo']['data']['id'] ?? 0;
+    if ($rol !== 2) $sql->prepare('UPDATE usuarios SET rol_id = ? WHERE id = ?')->execute([$rol, $id]);
+    $c->pedir('POST', '/api/login.php', ['email' => $email, 'password' => 'contrasena1']);
+    return ['c' => $c, 'id' => $id, 'email' => $email];
+}
+function es4xx(array $r): bool { return $r['codigo'] >= 400 && $r['codigo'] < 500; }
+function sin500(array $r): bool { return $r['codigo'] < 500; }
+function largo(int $n): string { return str_repeat('a', $n); }
+function ids(array $r): array { return array_column($r['cuerpo']['data'] ?? [], 'id'); }
+
+/* ═════════════════════════ SESION REVALIDADA EN CADA PETICION ═════════════════ */
+grupo('SESION REVALIDADA: SUSPENSION, CAMBIO DE ROL Y CIERRE');
+
+/* Una suspensión rige en la petición siguiente, sin esperar a que la persona salga. */
+$S = nuevoUsuario('susp');
+$r = $S['c']->pedir('GET', '/api/vehiculos.php');
+caso('sesion', 'Usuario activo con sesion abierta accede (200)', $r['codigo'] === 200, "codigo={$r['codigo']}");
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $S['id'], 'activo' => false]);
+caso('sesion', 'El administrador suspende al usuario', ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+$r = $S['c']->pedir('GET', '/api/vehiculos.php');
+caso('sesion', 'Suspendido, su sesion abierta da 401 de inmediato', $r['codigo'] === 401, "codigo={$r['codigo']}");
+$r = $S['c']->pedir('POST', '/api/login.php', ['email' => $S['email'], 'password' => 'contrasena1']);
+caso('sesion', 'Un suspendido no puede iniciar sesion', es4xx($r) && ($r['cuerpo']['ok'] ?? true) === false, "codigo={$r['codigo']}");
+$ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $S['id'], 'activo' => true]);
+$r = $S['c']->pedir('POST', '/api/login.php', ['email' => $S['email'], 'password' => 'contrasena1']);
+caso('sesion', 'Repuesto, el usuario vuelve a ingresar (200)', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+/* El rol vigente sale de la base, no del momento del ingreso. */
+$R = nuevoUsuario('rol');
+$r = $R['c']->pedir('GET', '/api/usuarios.php');
+caso('sesion', 'Antes del cambio de rol, un usuario comun no lista usuarios (403)', $r['codigo'] === 403, "codigo={$r['codigo']}");
+$ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $R['id'], 'rol_id' => 4]);
+$r = $R['c']->pedir('GET', '/api/usuarios.php');
+caso('sesion', 'El rol nuevo rige en la peticion siguiente, sin reingresar (200)', $r['codigo'] === 200, "codigo={$r['codigo']}");
+$ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $R['id'], 'rol_id' => 2]);
+$r = $R['c']->pedir('GET', '/api/usuarios.php');
+caso('sesion', 'Al quitarle el rol, el permiso se pierde en la peticion siguiente (403)', $r['codigo'] === 403, "codigo={$r['codigo']}");
+
+/* Cerrar sesión modifica estado: solo por POST. */
+$L = nuevoUsuario('salida');
+$r = $L['c']->pedir('GET', '/api/logout.php');
+caso('sesion', 'El cierre de sesion por GET da 405', $r['codigo'] === 405, "codigo={$r['codigo']}");
+$r = $L['c']->pedir('GET', '/api/vehiculos.php');
+caso('sesion', 'Tras el GET rechazado la sesion sigue abierta', $r['codigo'] === 200, "codigo={$r['codigo']}");
+$r = $L['c']->pedir('POST', '/api/logout.php');
+caso('sesion', 'El cierre de sesion por POST responde 200', $r['codigo'] === 200 && ($r['cuerpo']['ok'] ?? false) === true, "codigo={$r['codigo']}");
+$r = $L['c']->pedir('GET', '/api/vehiculos.php');
+caso('sesion', 'Tras cerrar sesion el acceso da 401', $r['codigo'] === 401, "codigo={$r['codigo']}");
+
+/* ═══════════════════════════════ PERMISOS POR ROL ═════════════════════════════ */
+grupo('PERMISOS POR ROL Y AUTOMODIFICACION');
+
+$C = nuevoUsuario('comun');
+foreach ([
+    ['Usuario comun no lista usuarios',                  'GET',   '/api/usuarios.php', null],
+    ['Usuario comun no accede a las estadisticas',       'GET',   '/api/stats.php', null],
+    ['Usuario comun no dispara la sincronizacion UTE',   'POST',  '/api/ute-sync.php', []],
+    ['Usuario comun no modera resenas',                  'PATCH', '/api/resenas.php', ['id' => $idRes, 'estado' => 'aprobada']],
+    ['Usuario comun no resuelve reportes',               'PATCH', '/api/reportes.php', ['id' => $idRep]],
+    ['Usuario comun no cambia roles ni suspende',        'PATCH', '/api/usuarios.php', ['id' => $idB, 'activo' => false]],
+] as [$nombre, $m, $ruta, $cuerpo]) {
+    $r = $C['c']->pedir($m, $ruta, $cuerpo);
+    caso('permisos', "$nombre (403)", $r['codigo'] === 403, "codigo={$r['codigo']}");
+}
+$r = $ANON->pedir('GET', '/api/stats.php');
+caso('permisos', 'Sin sesion las estadisticas dan 401', $r['codigo'] === 401, "codigo={$r['codigo']}");
+$r = $ADM->pedir('GET', '/api/stats.php');
+caso('permisos', 'El administrador accede a las estadisticas (200)', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $idADM, 'rol_id' => 2]);
+caso('permisos', 'Nadie se cambia el propio rol (409)', $r['codigo'] === 409, "codigo={$r['codigo']}");
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $idADM, 'activo' => false]);
+caso('permisos', 'El administrador no se desactiva a si mismo (409)', $r['codigo'] === 409, "codigo={$r['codigo']}");
+$r = $MOD->pedir('PATCH', '/api/usuarios.php', ['id' => $idMOD, 'activo' => false]);
+caso('permisos', 'El moderador no se desactiva a si mismo (409)', $r['codigo'] === 409, "codigo={$r['codigo']}");
+$q = $sql->prepare('SELECT rol_id, activo FROM usuarios WHERE id = ?');
+$q->execute([$idADM]);
+$fila = $q->fetch();
+caso('permisos', 'La cuenta del administrador queda intacta', (int)$fila['rol_id'] === 1 && (int)$fila['activo'] === 1);
+$r = $ADM->pedir('GET', '/api/stats.php');
+caso('permisos', 'El administrador sigue pudiendo operar tras los intentos', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+/* ══════════════════════ REGLA DE UTE Y CARGADORES AJENOS ═════════════════════ */
+grupo('REGLA DE UTE: NO SE RESERVA NI SE PAGA');
+
+/* Propietario nuevo: un cargador publico y otro privado de particular. */
+$P = nuevoUsuario('prop');
+$idPubP  = $P['c']->pedir('POST', '/api/cargadores.php', array_merge($base, ['nombre' => "Publico P $sufijo"]))['cuerpo']['data']['id'] ?? 0;
+$idPrivP = $P['c']->pedir('POST', '/api/cargadores.php', array_merge($base, ['nombre' => "Privado P $sufijo", 'acceso' => 'privado']))['cuerpo']['data']['id'] ?? 0;
+
+/* Estaciones de UTE puestas por SQL, como las dejaria la sincronizacion. Una es
+   publica y otra privada: la segunda aisla la fuente del tipo de acceso. */
+$tipo2 = $sql->query("SELECT id FROM tipos_conector WHERE nombre = 'Type 2'")->fetchColumn();
+$altaUte = function (string $acceso) use ($sql, $tipo2, $sufijo): array {
+    $sql->prepare("INSERT INTO puntos_carga (nombre, direccion, lat, lng, acceso, estado, fuente, activo) VALUES (?, 'Dir UTE', -34.9, -56.1, ?, 'disponible', 'ute', 1)")
+        ->execute(["UTE $acceso $sufijo", $acceso]);
+    $id = (int)$sql->lastInsertId();
+    $sql->prepare('INSERT INTO conectores (punto_carga_id, tipo_conector_id, potencia_kw) VALUES (?, ?, 22)')->execute([$id, $tipo2]);
+    return [$id, (int)$sql->query("SELECT id FROM conectores WHERE punto_carga_id = $id")->fetchColumn()];
+};
+[$idUteP, $conUteP] = $altaUte('publico');
+[$idUteR, $conUteR] = $altaUte('privado');
+$conPubP  = $sql->query("SELECT id FROM conectores WHERE punto_carga_id = $idPubP LIMIT 1")->fetchColumn();
+$conPrivP = $sql->query("SELECT id FROM conectores WHERE punto_carga_id = $idPrivP LIMIT 1")->fetchColumn();
+
+foreach ([
+    ['Estacion de UTE publica',                              $idUteP, $conUteP],
+    ['Estacion de UTE aunque figure como privada',           $idUteR, $conUteR],
+    ['Cargador publico de un particular',                    $idPubP, $conPubP],
+] as [$nombre, $pc, $con]) {
+    $r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $pc, 'vehiculo_id' => $idVeh, 'conector_id' => $con, 'soc_pct' => 20]);
+    caso('ute', "$nombre no admite pago (403)", $r['codigo'] === 403 && ($r['cuerpo']['ok'] ?? true) === false, "codigo={$r['codigo']}");
+}
+$r = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivP, 'vehiculo_id' => $idVeh, 'conector_id' => $conPrivP, 'soc_pct' => 20]);
+caso('ute', 'Control: el cargador privado de un particular si se paga (200)', $r['codigo'] === 200 && ($r['cuerpo']['ok'] ?? false) === true, "codigo={$r['codigo']}");
+$cuenta = $sql->query("SELECT COUNT(*) FROM transacciones WHERE punto_carga_id IN ($idUteP, $idUteR, $idPubP)")->fetchColumn();
+caso('ute', 'Los pagos rechazados no dejan transacciones', (int)$cuenta === 0, "filas=$cuenta");
+
+/* El estado de una estacion de UTE solo lo cambia un reporte de la comunidad.
+   La parte de la sincronizacion (que no pise ese estado) necesita llamar a la
+   API de UTE y no se puede ejercitar sin red: queda sin caso a proposito. */
+$r = $C['c']->pedir('PATCH', '/api/estado.php', ['punto_carga_id' => $idUteP, 'estado' => 'ocupado']);
+$est = $sql->query("SELECT estado FROM puntos_carga WHERE id = $idUteP")->fetchColumn();
+caso('ute', 'La comunidad cambia el estado de una estacion de UTE', $r['codigo'] === 200 && $est === 'ocupado', "codigo={$r['codigo']} estado=$est");
+
+/* ═══════════════════════ ESTADO Y COLA DE CARGADORES PRIVADOS ═════════════════ */
+grupo('ESTADO Y COLA: QUIEN PUEDE CAMBIARLOS');
+
+$estado = fn(int $id) => $sql->query("SELECT estado FROM puntos_carga WHERE id = $id")->fetchColumn();
+$colaDe = fn(int $id) => (int)$sql->query("SELECT cola FROM puntos_carga WHERE id = $id")->fetchColumn();
+
+$r = $C['c']->pedir('PATCH', '/api/estado.php', ['punto_carga_id' => $idPrivP, 'estado' => 'sin_servicio']);
+caso('estado', 'Un tercero no cambia el estado de un cargador privado ajeno (403)', $r['codigo'] === 403 && $estado($idPrivP) === 'disponible', "codigo={$r['codigo']}");
+$r = $C['c']->pedir('PATCH', '/api/cola.php', ['punto_carga_id' => $idPrivP, 'cola' => 3]);
+caso('cola', 'Un tercero no cambia la cola de un cargador privado ajeno (403)', $r['codigo'] === 403 && $colaDe($idPrivP) === 0, "codigo={$r['codigo']}");
+$r = $ANON->pedir('PATCH', '/api/estado.php', ['punto_carga_id' => $idPrivP, 'estado' => 'ocupado']);
+caso('estado', 'Sin sesion el estado no cambia (401)', $r['codigo'] === 401, "codigo={$r['codigo']}");
+
+$r = $P['c']->pedir('PATCH', '/api/estado.php', ['punto_carga_id' => $idPrivP, 'estado' => 'ocupado']);
+caso('estado', 'El propietario cambia el estado de su cargador privado', $r['codigo'] === 200 && $estado($idPrivP) === 'ocupado', "codigo={$r['codigo']}");
+$r = $P['c']->pedir('PATCH', '/api/cola.php', ['punto_carga_id' => $idPrivP, 'cola' => 2]);
+caso('cola', 'El propietario cambia la cola de su cargador privado', $r['codigo'] === 200 && $colaDe($idPrivP) === 2, "codigo={$r['codigo']}");
+$r = $MOD->pedir('PATCH', '/api/estado.php', ['punto_carga_id' => $idPrivP, 'estado' => 'disponible']);
+caso('estado', 'El moderador cambia el estado de un cargador privado', $r['codigo'] === 200 && $estado($idPrivP) === 'disponible', "codigo={$r['codigo']}");
+$r = $MOD->pedir('PATCH', '/api/cola.php', ['punto_carga_id' => $idPrivP, 'cola' => 1]);
+caso('cola', 'El moderador cambia la cola de un cargador privado', $r['codigo'] === 200 && $colaDe($idPrivP) === 1, "codigo={$r['codigo']}");
+
+$r = $C['c']->pedir('PATCH', '/api/estado.php', ['punto_carga_id' => $idPubP, 'estado' => 'ocupado']);
+caso('estado', 'En un cargador publico la comunidad si cambia el estado', $r['codigo'] === 200 && $estado($idPubP) === 'ocupado', "codigo={$r['codigo']}");
+$r = $C['c']->pedir('PATCH', '/api/cola.php', ['punto_carga_id' => $idPubP, 'cola' => 3]);
+caso('cola', 'En un cargador publico la comunidad si cambia la cola', $r['codigo'] === 200 && $colaDe($idPubP) === 3, "codigo={$r['codigo']}");
+
+/* ══════════════════════════════════ VEHICULOS ════════════════════════════════ */
+grupo('VEHICULOS: VALIDACION, PROPIEDAD Y TOPE');
+
+$V = nuevoUsuario('veh');
+$vehiculo = ['marca' => 'Tesla', 'modelo' => 'Model 3', 'capacidad_kwh' => 60, 'tipo_conector' => 'Type 2'];
+$r = $V['c']->pedir('POST', '/api/vehiculos.php', $vehiculo);
+caso('vehiculos', 'Alta valida de vehiculo', $r['codigo'] === 200 && ($r['cuerpo']['ok'] ?? false) === true, json_encode($r['cuerpo']));
+$idV = $r['cuerpo']['data']['id'] ?? 0;
+
+foreach ([
+    ['Capacidad cero rechazada',              ['capacidad_kwh' => 0]],
+    ['Capacidad negativa rechazada',          ['capacidad_kwh' => -40]],
+    ['Capacidad no numerica rechazada',       ['capacidad_kwh' => 'grande']],
+    ['Capacidad desmedida rechazada',         ['capacidad_kwh' => 99999]],
+    ['Tipo de conector inexistente rechazado', ['tipo_conector' => 'Inventado']],
+    ['Marca de mas de 40 caracteres',         ['marca' => largo(41)]],
+    ['Modelo de mas de 40 caracteres',        ['modelo' => largo(41)]],
+] as [$nombre, $cambio]) {
+    $r = $V['c']->pedir('POST', '/api/vehiculos.php', array_merge($vehiculo, $cambio));
+    caso('vehiculos', "$nombre (400 o 422)", in_array($r['codigo'], [400, 422], true) && ($r['cuerpo']['ok'] ?? true) === false, "codigo={$r['codigo']}");
+}
+
+$W = nuevoUsuario('veh');
+$r = $W['c']->pedir('DELETE', "/api/vehiculos.php?id=$idV");
+$activo = $sql->query("SELECT activo FROM vehiculos WHERE id = $idV")->fetchColumn();
+caso('vehiculos', 'No se da de baja un vehiculo ajeno (403 o 404)', in_array($r['codigo'], [403, 404], true) && (int)$activo === 1, "codigo={$r['codigo']}");
+$r = $V['c']->pedir('DELETE', "/api/vehiculos.php?id=$idV");
+caso('vehiculos', 'La baja del vehiculo propio funciona', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+/* El tope de diez activos se prepara por SQL para no gastar el cupo diario de altas. */
+$tope = nuevoUsuario('tope');
+$ins = $sql->prepare('INSERT INTO vehiculos (usuario_id, marca, modelo, capacidad_bateria_kwh, tipo_conector_id) VALUES (?, ?, ?, 50, ?)');
+for ($i = 1; $i <= 10; $i++) $ins->execute([$tope['id'], 'Marca', "Modelo $i", $tipo2]);
+$r = $tope['c']->pedir('POST', '/api/vehiculos.php', $vehiculo);
+caso('vehiculos', 'El undecimo vehiculo activo es rechazado (409)', $r['codigo'] === 409, "codigo={$r['codigo']}");
+$unoActivo = $tope['c']->pedir('GET', '/api/vehiculos.php')['cuerpo']['data'][0]['id'] ?? 0;
+$tope['c']->pedir('DELETE', "/api/vehiculos.php?id=$unoActivo");
+$r = $tope['c']->pedir('POST', '/api/vehiculos.php', $vehiculo);
+caso('vehiculos', 'Dando de baja uno, vuelve a poder agregar (200)', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+/* ══════════════════════════════════ RESERVAS ═════════════════════════════════ */
+grupo('HISTORIAL DE RESERVAS: SOLO LAS PROPIAS');
+
+$r = $A->pedir('GET', '/api/reservas.php');
+caso('reservas', 'El usuario ve su propia transaccion', $r['codigo'] === 200 && in_array($idTx, ids($r)), "codigo={$r['codigo']}");
+$r = $B->pedir('GET', '/api/reservas.php');
+caso('reservas', 'Otro usuario no ve transacciones ajenas', $r['codigo'] === 200 && !in_array($idTx, ids($r)));
+$r = $ANON->pedir('GET', '/api/reservas.php');
+caso('reservas', 'Sin sesion el historial da 401', $r['codigo'] === 401, "codigo={$r['codigo']}");
+$r = $B->pedir('PATCH', '/api/reservas.php', ['id' => $idTx]);
+caso('reservas', 'Marcar una transaccion ajena da 404', $r['codigo'] === 404, "codigo={$r['codigo']}");
+$r = $A->pedir('PATCH', '/api/reservas.php', ['id' => 999999999]);
+caso('reservas', 'Marcar una transaccion inexistente da 404', $r['codigo'] === 404, "codigo={$r['codigo']}");
+$r = $A->pedir('PATCH', '/api/reservas.php', ['id' => $idTx]);
+caso('reservas', 'Marcar una transaccion propia funciona (200)', $r['codigo'] === 200 && ($r['cuerpo']['ok'] ?? false) === true, "codigo={$r['codigo']}");
+
+/* ═══════════════════════════════ LIMITES DE USO ══════════════════════════════ */
+grupo('LIMITES DE USO (429)');
+
+/* Cada caso usa un cliente con IP propia o usuarios nuevos. Los intentos
+   invalidos no cuentan: solo las operaciones que llegan a escribir. */
+$LR = new Cliente('limreg');
+$codigos = [];
+for ($i = 1; $i <= 11; $i++)
+    $codigos[] = $LR->pedir('POST', '/api/registro.php', ['acepta' => true, 'nombre' => "Lim $i", 'email' => "lim{$i}_$sufijo@test.com",
+        'password' => 'contrasena1', 'rol' => 'particular', 'ci' => ciValida(random_int(1000000, 9999999))])['codigo'];
+caso('limites', 'Diez registros desde una IP en una hora son aceptados', count(array_filter(array_slice($codigos, 0, 10), fn($c) => $c === 200)) === 10, implode(',', $codigos));
+caso('limites', 'El undecimo registro desde la misma IP da 429', $codigos[10] === 429, 'codigo=' . $codigos[10]);
+
+/* Reseñas, reportes y altas: se llega al tope con un usuario nuevo sobre el cargador publico de P. */
+$u = nuevoUsuario('limres');
+$codigos = [];
+for ($i = 1; $i <= 6; $i++) $codigos[] = $u['c']->pedir('POST', '/api/resenas.php', ['punto_carga_id' => $idPubP, 'estrellas' => 4, 'texto' => "Resena $i"])['codigo'];
+caso('limites', 'Cinco resenas por hora son aceptadas', $codigos[4] === 200 && !in_array(429, array_slice($codigos, 0, 5), true), implode(',', $codigos));
+caso('limites', 'La sexta resena en una hora da 429', $codigos[5] === 429, 'codigo=' . $codigos[5]);
+
+$u = nuevoUsuario('limrep');
+$codigos = [];
+for ($i = 1; $i <= 11; $i++) $codigos[] = $u['c']->pedir('POST', '/api/reportes.php', ['punto_carga_id' => $idPubP, 'tipo' => 'fuera_servicio', 'descripcion' => "Reporte $i"])['codigo'];
+caso('limites', 'Diez reportes por hora son aceptados', $codigos[9] === 200 && !in_array(429, array_slice($codigos, 0, 10), true), implode(',', $codigos));
+caso('limites', 'El reporte numero once en una hora da 429', $codigos[10] === 429, 'codigo=' . $codigos[10]);
+
+$u = nuevoUsuario('limcar');
+$codigos = [];
+for ($i = 1; $i <= 6; $i++) $codigos[] = $u['c']->pedir('POST', '/api/cargadores.php', array_merge($base, ['nombre' => "Limite $i"]))['codigo'];
+caso('limites', 'Cinco altas de cargador en 24 h son aceptadas', $codigos[4] === 200 && !in_array(429, array_slice($codigos, 0, 5), true), implode(',', $codigos));
+caso('limites', 'La sexta alta de cargador en 24 h da 429', $codigos[5] === 429, 'codigo=' . $codigos[5]);
+
+/* ═══════════════════════════════ VALIDACION DE ENTRADA ════════════════════════ */
+grupo('VALIDACION: TOPES, RANGOS Y ENTRADAS HOSTILES');
+
+$H = nuevoUsuario('hostil');
+$TR = new Cliente('hostilreg');
+$cuerpoReg = ['acepta' => true, 'nombre' => 'Hostil', 'email' => "hostil_$sufijo@test.com", 'password' => 'contrasena1', 'rol' => 'particular', 'ci' => ciValida(random_int(1000000, 9999999))];
+
+/* Longitudes máximas: pasarse es 422 y no escribe nada. */
+foreach ([
+    ['nombre de mas de 120',        ['nombre' => largo(121)]],
+    ['direccion de mas de 200',     ['direccion' => largo(201)]],
+    ['ciudad de mas de 80',         ['ciudad' => largo(81)]],
+    ['departamento de mas de 80',   ['departamento' => largo(81)]],
+    ['horario de mas de 60',        ['horario' => largo(61)]],
+    ['descripcion de mas de 1000',  ['descripcion' => largo(1001)]],
+    ['costo_kwh de 10000',          ['costo_kwh' => 10000]],
+    ['costo_kwh negativo',          ['costo_kwh' => -0.01]],
+] as [$nombre, $cambio]) {
+    $r = $H['c']->pedir('POST', '/api/cargadores.php', array_merge($base, $cambio));
+    caso('validacion', "Cargador con $nombre da 422", $r['codigo'] === 422, "codigo={$r['codigo']}");
+}
+$r = $H['c']->pedir('POST', '/api/cargadores.php', array_merge($base, ['costo_kwh' => 9999.99]));
+caso('validacion', 'costo_kwh de 9999,99 (el maximo de la columna) es aceptado', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+$r = $H['c']->pedir('POST', '/api/resenas.php', ['punto_carga_id' => $idPubP, 'estrellas' => 4, 'texto' => largo(1001)]);
+caso('validacion', 'Resena de mas de 1000 caracteres da 422', $r['codigo'] === 422, "codigo={$r['codigo']}");
+$r = $H['c']->pedir('POST', '/api/reportes.php', ['punto_carga_id' => $idPubP, 'tipo' => 'fuera_servicio', 'descripcion' => largo(1001)]);
+caso('validacion', 'Descripcion de reporte de mas de 1000 caracteres da 422', $r['codigo'] === 422, "codigo={$r['codigo']}");
+
+/* Una calificación con comentario largo necesita una transacción propia sin calificar. */
+$pago = $A->pedir('POST', '/api/pagos.php', ['punto_carga_id' => $idPrivado, 'vehiculo_id' => $idVeh, 'conector_id' => $conector, 'soc_pct' => 50]);
+$tx2 = $pago['cuerpo']['data']['id'] ?? 0;
+$r = $A->pedir('POST', '/api/calificaciones.php', ['para_usuario_id' => $idB, 'transaccion_id' => $tx2, 'puntos' => 4, 'comentario' => largo(501)]);
+caso('validacion', 'Comentario de calificacion de mas de 500 caracteres da 422', $r['codigo'] === 422, "codigo={$r['codigo']}");
+$r = $A->pedir('POST', '/api/calificaciones.php', ['para_usuario_id' => $idB, 'transaccion_id' => $tx2, 'puntos' => 4, 'comentario' => largo(500)]);
+caso('validacion', 'Comentario de exactamente 500 caracteres es aceptado', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+/* Contraseñas: el tope de 72 es de bytes (límite de bcrypt), no de caracteres. */
+$r = $TR->pedir('POST', '/api/registro.php', array_merge($cuerpoReg, ['password' => str_repeat('a', 73)]));
+caso('validacion', 'Contrasena de 73 bytes da 422', $r['codigo'] === 422, "codigo={$r['codigo']}");
+$r = $TR->pedir('POST', '/api/registro.php', array_merge($cuerpoReg, ['password' => str_repeat('ñ', 37)]));
+caso('validacion', 'Contrasena de 37 caracteres y 74 bytes da 422', $r['codigo'] === 422, "codigo={$r['codigo']}");
+$r = $TR->pedir('POST', '/api/registro.php', array_merge($cuerpoReg, ['password' => str_repeat('a', 72)]));
+caso('validacion', 'Contrasena de 72 bytes es aceptada', $r['codigo'] === 200, "codigo={$r['codigo']}");
+
+/* Entradas hostiles: arreglos u objetos donde va texto. Ninguna puede dar 500;
+   donde el dato es obligatorio el rechazo es 4xx. */
+$obligatorios = [
+    ['registro con nombre arreglo',        $TR, '/api/registro.php',   'POST', array_merge($cuerpoReg, ['nombre' => ['x'], 'email' => "h1_$sufijo@test.com"])],
+    ['registro con correo arreglo',        $TR, '/api/registro.php',   'POST', array_merge($cuerpoReg, ['email' => ['x']])],
+    ['registro con contrasena arreglo',    $TR, '/api/registro.php',   'POST', array_merge($cuerpoReg, ['password' => ['x'], 'email' => "h2_$sufijo@test.com"])],
+    ['registro con documento arreglo',     $TR, '/api/registro.php',   'POST', array_merge($cuerpoReg, ['ci' => ['x'], 'email' => "h3_$sufijo@test.com"])],
+    ['login con correo arreglo',           $TR, '/api/login.php',      'POST', ['email' => ['x'], 'password' => 'contrasena1']],
+    ['login con contrasena arreglo',       $TR, '/api/login.php',      'POST', ['email' => "hostil_$sufijo@test.com", 'password' => ['x']]],
+    ['cargador con nombre arreglo',        $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['nombre' => ['x']])],
+    ['cargador con acceso arreglo',        $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['acceso' => ['privado']])],
+    ['cargador con precio arreglo',        $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['costo_kwh' => ['1']])],
+    ['cargador con latitud arreglo',       $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['lat' => ['1']])],
+    ['cargador con conectores como texto', $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['conectores' => 'Type 2'])],
+    ['cargador con tipo de conector arreglo', $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['conectores' => [['tipo' => ['x'], 'potencia' => 22]]])],
+    ['cargador con potencia arreglo',      $H['c'], '/api/cargadores.php', 'POST', array_merge($base, ['conectores' => [['tipo' => 'Type 2', 'potencia' => [22]]]])],
+    ['vehiculo con marca arreglo',         $H['c'], '/api/vehiculos.php',  'POST', array_merge($vehiculo, ['marca' => ['x']])],
+    ['vehiculo con tipo de conector arreglo', $H['c'], '/api/vehiculos.php', 'POST', array_merge($vehiculo, ['tipo_conector' => ['x']])],
+    ['reporte con tipo arreglo',           $H['c'], '/api/reportes.php',   'POST', ['punto_carga_id' => $idPubP, 'tipo' => ['x']]],
+    ['estado con valor arreglo',           $H['c'], '/api/estado.php',     'PATCH', ['punto_carga_id' => $idPubP, 'estado' => ['ocupado']]],
+    ['usuarios con activo arreglo',        $ADM, '/api/usuarios.php',      'PATCH', ['id' => $H['id'], 'activo' => []]],
+    ['usuarios con activo no booleano',    $ADM, '/api/usuarios.php',      'PATCH', ['id' => $H['id'], 'activo' => 'quizas']],
+];
+foreach ($obligatorios as [$nombre, $cli, $ruta, $m, $cuerpo]) {
+    $r = $cli->pedir($m, $ruta, $cuerpo);
+    caso('validacion', "Hostil, $nombre: 4xx y nunca 500", es4xx($r) && ($r['cuerpo']['ok'] ?? true) === false, "codigo={$r['codigo']}");
+}
+
+/* Campos de texto opcionales con basura: puede aceptarse o rechazarse, pero no fallar. */
+$opcionales = [
+    ['resena con texto arreglo',           $H['c'], '/api/resenas.php',        'POST', ['punto_carga_id' => $idPubP, 'estrellas' => 4, 'texto' => ['x']]],
+    ['resena con estrellas arreglo',       $H['c'], '/api/resenas.php',        'POST', ['punto_carga_id' => $idPubP, 'estrellas' => [4], 'texto' => 'x']],
+    ['reporte con descripcion arreglo',    $H['c'], '/api/reportes.php',       'POST', ['punto_carga_id' => $idPubP, 'tipo' => 'fuera_servicio', 'descripcion' => ['x']]],
+    ['calificacion con comentario arreglo', $A,     '/api/calificaciones.php', 'POST', ['para_usuario_id' => $idB, 'transaccion_id' => $tx2, 'puntos' => 3, 'comentario' => ['x']]],
+    ['calificacion con puntos arreglo',    $A,      '/api/calificaciones.php', 'POST', ['para_usuario_id' => $idB, 'transaccion_id' => $tx2, 'puntos' => [3]]],
+    ['vehiculo con capacidad arreglo',     $H['c'], '/api/vehiculos.php',      'POST', array_merge($vehiculo, ['capacidad_kwh' => [60]])],
+    ['cola con valor arreglo',             $H['c'], '/api/cola.php',           'PATCH', ['punto_carga_id' => $idPubP, 'cola' => [1]]],
+    ['punto_carga_id arreglo en estado',   $H['c'], '/api/estado.php',         'PATCH', ['punto_carga_id' => [1], 'estado' => 'ocupado']],
+    ['recuperar con correo arreglo',       $TR,     '/api/recuperar.php',      'POST', ['email' => ['x']]],
+    ['restablecer con token arreglo',      $TR,     '/api/restablecer.php',    'POST', ['token' => ['x'], 'password' => 'contrasena1']],
+    ['restablecer con contrasena arreglo', $TR,     '/api/restablecer.php',    'POST', ['token' => 'abc', 'password' => ['x']]],
+    ['cuerpo que es una lista, no un objeto', $H['c'], '/api/resenas.php',     'POST', [1, 2, 3]],
+    ['cuerpo vacio en cargadores',         $H['c'], '/api/cargadores.php',     'POST', []],
+];
+foreach ($opcionales as [$nombre, $cli, $ruta, $m, $cuerpo]) {
+    $r = $cli->pedir($m, $ruta, $cuerpo);
+    caso('validacion', "Hostil, $nombre: no da 500", sin500($r), "codigo={$r['codigo']}");
+}
+
+/* Parámetros de URL hostiles y paginación fuera de rango: se corrigen, no fallan. */
+foreach ([
+    ['usuarios con pagina negativa y por_pagina enorme', $ADM, '/api/usuarios.php?pagina=-5&por_pagina=999999'],
+    ['usuarios con pagina no numerica',                  $ADM, '/api/usuarios.php?pagina=abc&por_pagina=xyz'],
+    ['usuarios con pagina desmedida',                    $ADM, '/api/usuarios.php?pagina=99999999999999999999'],
+    ['usuarios con q arreglo',                           $ADM, '/api/usuarios.php?q[]=x'],
+    ['usuarios con rol arreglo',                         $ADM, '/api/usuarios.php?rol[]=1'],
+    ['resenas pendientes con paginacion fuera de rango', $MOD, '/api/resenas.php?pagina=-1&por_pagina=0'],
+    ['reportes pendientes con paginacion fuera de rango', $MOD, '/api/reportes.php?pagina=-1&por_pagina=100000'],
+] as [$nombre, $cli, $ruta]) {
+    $r = $cli->pedir('GET', $ruta);
+    caso('paginacion', "$nombre da 200", $r['codigo'] === 200, "codigo={$r['codigo']}");
+}
+foreach ([
+    ['limit negativo y offset negativo',  "/api/resenas.php?punto_carga_id=$idPubP&limit=-1&offset=-5"],
+    ['limit y offset no numericos',       "/api/resenas.php?punto_carga_id=$idPubP&limit=abc&offset=xyz"],
+    ['offset desmedido',                  "/api/resenas.php?punto_carga_id=$idPubP&offset=99999999999999999999"],
+    ['punto_carga_id arreglo',            '/api/resenas.php?punto_carga_id[]=1'],
+    ['estacion con id arreglo',           '/api/estacion.php?id[]=1'],
+    ['estaciones con parametros basura',  '/api/estaciones.php?limit=-1&offset=-1&q[]=x'],
+] as [$nombre, $ruta]) {
+    $r = $ANON->pedir('GET', $ruta);
+    caso('paginacion', "Publico, $nombre: no da 500", sin500($r), "codigo={$r['codigo']}");
+}
+
+/* usuarios.php: activo es booleano estricto; "false" cuenta como falso. */
+$X = nuevoUsuario('activo');
+$activoDe = fn() => (int)$sql->query("SELECT activo FROM usuarios WHERE id = {$X['id']}")->fetchColumn();
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $X['id'], 'activo' => 'false']);
+caso('usuarios', 'activo con el texto "false" desactiva la cuenta', $r['codigo'] === 200 && $activoDe() === 0, "codigo={$r['codigo']}");
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $X['id'], 'activo' => 1]);
+caso('usuarios', 'activo igual a 1 reactiva la cuenta', $r['codigo'] === 200 && $activoDe() === 1, "codigo={$r['codigo']}");
+$r = $ADM->pedir('PATCH', '/api/usuarios.php', ['id' => $X['id'], 'activo' => 'quizas']);
+caso('usuarios', 'activo con un valor que no es booleano da 400 y no cambia nada', $r['codigo'] === 400 && $activoDe() === 1, "codigo={$r['codigo']}");
 
 resumen();
